@@ -18,13 +18,14 @@ pip_ref=pip
 
 ### Make python environment
 module unload python3
+module unload cuda
 module load python3/3.10.11 
-module load cuda/11.7
+module load cuda/11.8
 python3 -m venv $env_name
 
 
 ### activate env
-# source $env_name/bin/activate
+source $env_name/bin/activate
 
 ### update pip and package setup tools
 $python_ref -E -m $pip_ref install --upgrade $pip_ref
@@ -33,13 +34,15 @@ $python_ref -E -m $pip_ref install --upgrade wheel
 
 ### install python requirements
 $python_ref -m $pip_ref install -r 02514-Deep-Learning-In-Computer-Vision/requirements.txt
+$python_ref -m $pip_ref install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 
 ### Go back to run dir and deactivate env
-# cd $run_dir
-# deactivate
+cd $run_dir
+deactivate
 
 ### Test
 source ../$env_name/bin/activate
 echo python --version
+python test.py
 deactivate

@@ -1,4 +1,4 @@
 seaborn
 tqdm
-torch 
-torchvision
+# torch 
+# torchvision
