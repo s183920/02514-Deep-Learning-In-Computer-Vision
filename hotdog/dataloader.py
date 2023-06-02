@@ -30,8 +30,13 @@ class HotdogDataset(datasets.ImageFolder):
     
     def transform_label(self, label):
         return self.classes[label]
-    
-    
+
+
+
+
+
+
+
     
 if __name__ == "__main__":
     dataset = HotdogDataset()
@@ -45,3 +50,9 @@ if __name__ == "__main__":
         plt.axis('off')
     
     plt.savefig('hotdog_overview.png')
+
+    
+
+
+
+
