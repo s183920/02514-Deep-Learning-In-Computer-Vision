@@ -22,4 +22,4 @@ hpc2:
 	cd /work3/s183920/02514-deep-learning-with-PyTorch
 
 port_forward:
-	ssh s183920@login1.hpc.dtu.dk -g -L8811:n-62-11-14:8811 –N
+	ssh s183920@login1.hpc.dtu.dk -g -L8000:n-62-20-5:8000 –N
