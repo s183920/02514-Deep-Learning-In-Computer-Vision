@@ -12,4 +12,4 @@ jupyter:
 	jupyter notebook --notebook-dir=exercises --no-browser --port={$PORT_NUMBER_TO_SERVE_JUPYTER_NOTEBOOK}
 
 port_forward:
-	ssh s183920@login1.hpc.dtu.dk -g -L8811:n-62-11-14:8811 –N
+	ssh s183920@login1.hpc.dtu.dk -g -L8000:n-62-20-5:8000 –N
