@@ -159,3 +159,5 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 exercises/ex1/data/*
+exercises/ex1/cifar10_data/*
+hotdog/data/*
