@@ -1,0 +1,8 @@
+method: random
+name: sweep
+metric:
+  goal: maximize
+  name: Validation metrics/test_acc
+parameters:
+  epochs:
+    values: [5, 10, 15]

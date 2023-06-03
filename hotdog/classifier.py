@@ -4,7 +4,7 @@ from model import models
 from dataloader import HotdogDataset
 from tqdm import tqdm
 import os
-from hparams import wandb_defaults, default_config
+from hparams import wandb_defaults, default_config, sweep_defaults
 import wandb
 from PIL import Image as PILImage
 
@@ -284,10 +284,23 @@ class HotdogClassifier:
         
         # wandb.log({"test_images": test_images})
         self.test_images = test_images
-            
+        
+    # def sweep(self, **kwargs):
+    #     sweep_configuration = sweep_defaults.copy()
+    #     sweep_configuration.update(kwargs)
+        
+    #     sweep_id = wandb.sweep(
+    #         sweep=sweep_configuration, 
+    #         project='my-first-sweep'
+    #     )
+        
+    #     # Start sweep job.
+    #     wandb.agent(sweep_id, function=self.train, count=4)
+                
         
         
 if __name__ == "__main__":
     classifier = HotdogClassifier(show_test_images=False)
     # classifier.dev_mode = True
     classifier.train(num_epochs=10)
+    # classifier.sweep()

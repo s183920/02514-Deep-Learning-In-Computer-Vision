@@ -21,3 +21,22 @@ default_config = {
 	"train_dataloader_kwargs" : {},
 	"test_dataloader_kwargs" : {},
 }
+
+sweep_defaults = {
+    'method': 'random',
+    'name': 'sweep',
+    'metric': {
+        'goal': 'maximize', 
+        'name': 'Validation metrics/test_acc'
+        },
+    'parameters': {
+        # 'batch_size': {'values': [16, 32, 64]},
+        'epochs': {'values': [5, 10, 15]},
+        # 'lr': {'max': 0.1, 'min': 0.0001}
+     },
+    # "early_terminate": {
+	# 	"type": "hyperband",
+	# 	"min_iter": 1,
+	# 	"max_iter": 3,
+	# }
+}
