@@ -20,7 +20,7 @@ class HotdogDataset(datasets.ImageFolder):
     @property
     def default_transform(self):
         return transforms.Compose([
-            transforms.Resize((224, 224)),
+            transforms.Resize((150, 150)),
             transforms.ToTensor(),
         ])
         
