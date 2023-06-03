@@ -110,6 +110,9 @@ class HotdogClassifier:
         
   
     def prepare_train(self, cuda_device):
+        # set seed
+        torch.manual_seed(self.config.get("seed", 0))
+        
         # set visible cuda devices
         if self.device.type == "cuda":
             os.environ["CUDA_VISIBLE_DEVICES"] = str(cuda_device).strip("[]").replace(" ", "")
