@@ -30,6 +30,7 @@ class HotdogDataset(datasets.ImageFolder):
     
     def transform_label(self, label):
         return self.classes[label]
+    
 
 
 

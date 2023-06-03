@@ -32,7 +32,7 @@
 
 ### Load modules
 # module load python3
-module load cuda/11.8
+# module load cuda/11.8
 
 ### Run setup
 # sh setup.sh $run_dir || exit 1
