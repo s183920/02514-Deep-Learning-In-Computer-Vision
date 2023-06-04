@@ -285,22 +285,23 @@ class HotdogClassifier:
         # wandb.log({"test_images": test_images})
         self.test_images = test_images
         
-    # def sweep(self, **kwargs):
-    #     sweep_configuration = sweep_defaults.copy()
-    #     sweep_configuration.update(kwargs)
+    def sweep(self, **kwargs):
+        sweep_configuration = sweep_defaults.copy()
+        sweep_configuration.update(kwargs)
         
-    #     sweep_id = wandb.sweep(
-    #         sweep=sweep_configuration, 
-    #         project='my-first-sweep'
-    #     )
+        sweep_id = wandb.sweep(
+            sweep=sweep_configuration, 
+            project='Hotdog-sweeps'
+        )
         
-    #     # Start sweep job.
-    #     wandb.agent(sweep_id, function=self.train, count=4)
+        # Start sweep job.
+        # wandb.agent(sweep_id, function=self.train, count=4)
+        os.system(f"wandb agent {sweep_id}")
                 
         
         
 if __name__ == "__main__":
     classifier = HotdogClassifier(show_test_images=False)
     # classifier.dev_mode = True
-    classifier.train(num_epochs=10)
-    # classifier.sweep()
+    # classifier.train(num_epochs=10)
+    classifier.sweep()

@@ -1,7 +1,7 @@
 wandb_defaults = {
 	# "sync_tensorboard":True, 
 	"reinit":True,
-	# "entity" : "deepcomputer",
+	"entity" : "deepcomputer",
 	# "name" : self.run_name,
 	"project" : "Hotdog", # wandb project name, each project correpsonds to an experiment
 	# "dir" : "logs/" + "GetStarted", # dir to store the run in
@@ -23,15 +23,16 @@ default_config = {
 }
 
 sweep_defaults = {
-    'method': 'random',
-    'name': 'sweep',
+    'program': "hotdog/cli.py",
+    'method': 'bayes',
+    # 'name': 'sweep',
     'metric': {
         'goal': 'maximize', 
         'name': 'Validation metrics/test_acc'
         },
     'parameters': {
         # 'batch_size': {'values': [16, 32, 64]},
-        'epochs': {'values': [5, 10, 15]},
+        'num_epochs': {'max': 20, "min": 1, "distribution" : "int_uniform"},
         # 'lr': {'max': 0.1, 'min': 0.0001}
      },
     # "early_terminate": {

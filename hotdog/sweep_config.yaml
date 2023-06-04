@@ -1,8 +1,22 @@
-method: random
-name: sweep
+program: hotdog/cli.py
+method: bayes
 metric:
   goal: maximize
   name: Validation metrics/test_acc
 parameters:
-  epochs:
-    values: [5, 10, 15]
+  num_epochs:
+    max: 20
+    min: 1
+    distribution: int_uniform
+  optimizer:
+    values:
+      - Adam
+    distribution: categorical
+  loss_fun:
+    values:
+      - CrossEntropyLoss
+    distribution: categorical
+  model:
+    values:
+      - SimpleCNN
+    distribution: categorical
