@@ -328,11 +328,7 @@ class HotdogClassifier:
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
     classifier = HotdogClassifier(show_test_images=False, model = "ResNet")
-=======
-    classifier = HotdogClassifier(show_test_images=False, num_epochs = 3, model = "SimpleCNN")
->>>>>>> cfbcb3bfa8c7e7160b337450831cf60bf7790d30
     # classifier.dev_mode = True
     classifier.train(num_epochs=10)
     # classifier.sweep()
