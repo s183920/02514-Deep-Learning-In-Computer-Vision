@@ -8,6 +8,7 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
+import random
 
 class HotdogDataset(datasets.ImageFolder):
     
@@ -20,7 +21,9 @@ class HotdogDataset(datasets.ImageFolder):
     @property
     def default_transform(self):
         return transforms.Compose([
-            transforms.Resize((150, 150)),
+            transforms.Resize((128, 128)),
+            transforms.RandomRotation(random.randint(-70,70)),
+            transforms.RandomHorizontalFlip(0.3),
             transforms.ToTensor(),
         ])
         
