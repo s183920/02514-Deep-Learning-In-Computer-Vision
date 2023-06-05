@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 class HotdogDataset(datasets.ImageFolder):
     
     def __init__(self, train = True, transform = None, *args, **kwargs):
-        # self.datadir = 'hotdog/data/' + ('train' if train else 'test')
+        # self.datadir = 'hotdog/small_data/' + ('train' if train else 'test')
         self.datadir = '/dtu/datasets1/02514/hotdog_nothotdog/' + ('train' if train else 'test')
         transform = transform if transform else self.default_transform
         super().__init__(self.datadir, transform=transform, *args, **kwargs)
@@ -31,7 +31,13 @@ class HotdogDataset(datasets.ImageFolder):
     def transform_label(self, label):
         return self.classes[label]
     
-    
+
+
+
+
+
+
+
     
 if __name__ == "__main__":
     dataset = HotdogDataset()
@@ -45,3 +51,9 @@ if __name__ == "__main__":
         plt.axis('off')
     
     plt.savefig('hotdog_overview.png')
+
+    
+
+
+
+
