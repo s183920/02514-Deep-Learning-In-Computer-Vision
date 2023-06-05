@@ -185,20 +185,6 @@ class TestCNN(nn.Module):
             nn.BatchNorm2d(128),
         )
 
-        # self.fully_connected = nn.Sequential(
-        #     nn.Linear(128*(16*16), 1024),
-        #     nn.ReLU(),
-        #     nn.Linear(1024,512),
-        #     nn.ReLU(),
-        #     nn.Linear(512,256),
-        #     nn.ReLU(),
-        #     nn.Linear(256, 128),
-        #     nn.ReLU(),
-        #     nn.Linear(128, 64),
-        #     nn.ReLU(),
-        #     nn.Linear(64, 1),
-        #     nn.LogSoftmax(dim=1)
-        # )
         self.fully_connected = nn.Sequential(
             nn.Linear(16*16*128, 512),
             nn.ReLU(),
@@ -236,7 +222,6 @@ models = {
 
 
 if __name__ == "__main__":
-
     # model = SimpleCNN()
     # model = ResNet()
     model = TestCNN()
