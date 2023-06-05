@@ -8,7 +8,7 @@ from hparams import wandb_defaults, default_config, sweep_defaults
 import wandb
 from PIL import Image as PILImage
 
-from utils import data_to_img_array
+from utils import data_to_img_array, download_model
 
 from datetime import datetime as dt
 
@@ -57,10 +57,17 @@ class HotdogClassifier:
         # set dataset
         self.set_dataset()
         
+    
+    def load_model(self, path):
+        if path.startswith("wandb:"):
+            dl_path = "logs/Hotdog/models/"
+            path = path[5:]
+            path = download_model(path, dl_path)
         
+        self.model.load_state_dict(torch.load(path))           
         
-     
     def set_model(self, model):
+        print(f"Setting model to {model}")
         model = models.get(model) 
         if model is None:
             raise ValueError(f"Model not found")
@@ -72,7 +79,7 @@ class HotdogClassifier:
         self.data_train = HotdogDataset(**self.config.get("train_dataset_kwargs", {}))
         self.data_test = HotdogDataset(train=False, **self.config.get("test_dataset_kwargs", {}))
              
-        self.train_loader = self.data_train.get_dataloader(**self.config.get("train_dataloader_kwargs", {}))
+        self.train_loader, self.val_loader = self.data_train.get_dataloader(**self.config.get("train_dataloader_kwargs", {}))
         self.test_loader = self.data_test.get_dataloader(**self.config.get("test_dataloader_kwargs", {}))
     
     def set_optimizer(self):
@@ -93,7 +100,7 @@ class HotdogClassifier:
         # overwrite defaults with parsed arguments
         wandb_settings = wandb_defaults.copy()
         wandb_settings.update(kwargs)
-        wandb_settings.update({"dir" : "logs/" + wandb_settings.get("project") + self.name}) # create log dir
+        wandb_settings.update({"dir" : "logs/" + wandb_settings.get("project") + "/" + self.name}) # create log dir
         wandb_settings.update({"name" : self.name, "group": self.model.name}) # set run name
 
         # create directory for logs if first run in project
@@ -182,7 +189,7 @@ class HotdogClassifier:
             self.save_model(f"logs/Hotdog/models/{self.name}.pth", epoch)
             
             # test 
-            test_acc, test_loss, conf_mat = self.test()
+            val_acc, val_loss, conf_mat = self.test(validation=True)
             
             
             # log to wandb
@@ -191,25 +198,30 @@ class HotdogClassifier:
                 self.wandb_run.log({
                     "Train metrics/train_acc":    train_acc,
                     "Train metrics/train_loss":   train_loss,
-                    "Validation metrics/test_acc":     test_acc,
-                    "Validation metrics/test_loss":    test_loss,
+                    "Validation metrics/test_acc":     val_acc,
+                    "Validation metrics/test_loss":    val_loss,
                     "epoch":        epoch+1,
                     "test_images":  self.test_images,
                 })
             
             
             
-    def test(self):        
-        if self.verbose:
-            print("Testing model...")
+    def test(self, validation = False):       
+        if validation:
+            data_loader = self.val_loader
+        else:
+            data_loader = self.test_loader
         
         # Init counters
         test_correct = 0
         test_loss = 0
         
+        # conf matrix
+        true_positive, true_negative, false_positive, false_negative = 0, 0, 0, 0
+        
         # Test the model
         self.model.eval()
-        for data, target in self.test_loader:
+        for data, target in data_loader:
             data = data.to(self.device)
             with torch.no_grad():
                 output = self.model(data)
@@ -224,10 +236,17 @@ class HotdogClassifier:
         test_loss /= len(self.test_loader)
         
         # calculate confusion matrix
-        true_positive, true_negative, false_positive, false_negative = self.calculate_confusion_matrix(target, predicted)
-        # conf_mat = self.calculate_confusion_matrix(data, target, predicted)
-        conf_mat = {"true_positive": true_positive, "true_negative": true_negative, "false_positive": false_positive, "false_negative": false_negative}
+        tp, tn, fp, fn = self.calculate_confusion_matrix(target, predicted)
+        true_positive += tp
+        true_negative += tn
+        false_positive += fp
+        false_negative += fn
         
+        # calculate confusion matrix
+        len_test = len(self.data_test)        
+        test_acc = test_correct/len_test*100
+        test_loss /= len(self.test_loader)
+        conf_mat = {"true_positive": true_positive/len_test, "true_negative": true_negative/len_test, "false_positive": false_positive/len_test, "false_negative": false_negative/len_test}
         
         if self.verbose:
             print("Accuracy test: {test:.1f}%".format(test=test_acc))
@@ -238,11 +257,11 @@ class HotdogClassifier:
         return test_acc, test_loss, conf_mat
     
     def calculate_confusion_matrix(self, target, predicted, idx = False):
-        print(target.shape, predicted.shape)
-        true_positive = ((target==predicted) & (target==1))
-        true_negative = ((target==predicted) & (target==0))
-        false_positive = ((target!=predicted) & (target==0))
-        false_negative = ((target!=predicted) & (target==1))
+        # positve = hotdog (0)
+        true_positive = ((target==predicted) & (target==0))
+        true_negative = ((target==predicted) & (target==1))
+        false_positive = ((target!=predicted) & (target==1))
+        false_negative = ((target!=predicted) & (target==0))
         
         if idx:
            return true_positive, true_negative, false_positive, false_negative
@@ -254,10 +273,10 @@ class HotdogClassifier:
         false_positive = false_positive.sum().item()
         false_negative = false_negative.sum().item()
         
-        print(f"True positive: {true_positive}")
-        print(f"True negative: {true_negative}")
-        print(f"False positive: {false_positive}")
-        print(f"False negative: {false_negative}")
+        # print(f"True positive: {true_positive}")
+        # print(f"True negative: {true_negative}")
+        # print(f"False positive: {false_positive}")
+        # print(f"False negative: {false_negative}")
  
         return true_positive, true_negative, false_positive, false_negative
             
@@ -301,7 +320,6 @@ class HotdogClassifier:
         
         
 if __name__ == "__main__":
-    classifier = HotdogClassifier(show_test_images=False)
+    classifier = HotdogClassifier(show_test_images=False, num_epochs = 3, model = "NewCNN")
     # classifier.dev_mode = True
-    # classifier.train(num_epochs=10)
-    classifier.sweep()
+    classifier.train()  
