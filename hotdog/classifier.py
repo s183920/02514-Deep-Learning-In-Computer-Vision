@@ -211,6 +211,9 @@ class HotdogClassifier:
             data_loader = self.val_loader
         else:
             data_loader = self.test_loader
+        data_len = len(data_loader.dataset)
+        
+        print("Performing test with {} images".format(data_len))
         
         # Init counters
         test_correct = 0
@@ -231,22 +234,18 @@ class HotdogClassifier:
             test_correct += (target==predicted).sum().item()
             test_loss += self.loss_fun(output.cpu(), target).item()
             
-        # compute stats        
-        test_acc = test_correct/len(self.data_test)*100
-        test_loss /= len(self.test_loader)
         
-        # calculate confusion matrix
-        tp, tn, fp, fn = self.calculate_confusion_matrix(target, predicted)
-        true_positive += tp
-        true_negative += tn
-        false_positive += fp
-        false_negative += fn
+            # calculate confusion matrix
+            tp, tn, fp, fn = self.calculate_confusion_matrix(target, predicted)
+            true_positive += tp
+            true_negative += tn
+            false_positive += fp
+            false_negative += fn
         
-        # calculate confusion matrix
-        len_test = len(self.data_test)        
-        test_acc = test_correct/len_test*100
-        test_loss /= len(self.test_loader)
-        conf_mat = {"true_positive": true_positive/len_test, "true_negative": true_negative/len_test, "false_positive": false_positive/len_test, "false_negative": false_negative/len_test}
+        # calculate confusion matrix      
+        test_acc = test_correct/data_len*100
+        test_loss /= len(data_loader)
+        conf_mat = {"true_positive": true_positive/data_len, "true_negative": true_negative/data_len, "false_positive": false_positive/data_len, "false_negative": false_negative/data_len}
         
         if self.verbose:
             print("Accuracy test: {test:.1f}%".format(test=test_acc))
@@ -292,9 +291,13 @@ class HotdogClassifier:
         
         # log images
         test_images = []
-        for i in range(min(3, len(misclassified))):
-            pil_image = PILImage.fromarray(misclassified[i], mode="RGB")
-            image = wandb.Image(pil_image, caption=f"Misclassified {i}, pred = {torch.exp(output[:i])}")
+        idxs = torch.randint(0, len(target))
+        # for i in range(min(3, len(misclassified))):
+        for i in idxs:
+            # pil_image = PILImage.fromarray(misclassified[i], mode="RGB")
+            # pil_image = PILImage.fromarray(data[i].cpu(), mode="RGB")
+            pil_image = data_to_img_array(data[i].cpu().unsqueeze(0))
+            image = wandb.Image(pil_image, caption=f"Misclassified {i}, pred = {torch.exp(output[i]).item()}, target = {target[i].item()}")
             test_images.append(image)
             
             # pil_image = PILImage.fromarray(correct_classified[i].squeeze().transpose(1,2,0), mode="RGB")
@@ -320,6 +323,6 @@ class HotdogClassifier:
         
         
 if __name__ == "__main__":
-    classifier = HotdogClassifier(show_test_images=False, num_epochs = 3, model = "NewCNN")
+    classifier = HotdogClassifier(show_test_images=False, num_epochs = 3, model = "SimpleCNN")
     # classifier.dev_mode = True
     classifier.train()  
