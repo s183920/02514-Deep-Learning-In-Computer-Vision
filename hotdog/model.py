@@ -80,7 +80,7 @@ class ResNet(nn.Module):
         x = self.ResNet_blocks(x)
         x = x.view(x.size(0), -1)    #reshape x so it becomes flat, except for the first dimension (which is the minibatch)
         out = self.fc(x)
-        return out#.view(-1).float()
+        return out
 
 
     @property
@@ -176,26 +176,38 @@ class TestCNN(nn.Module):
             nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 1),
             nn.ReLU(),
             nn.MaxPool2d(2),
+            nn.Dropout(0.5),
             nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 1),
             nn.ReLU(),
             nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 1),
             nn.ReLU(),
-            nn.MaxPool2d(2)
+            nn.MaxPool2d(2),
+            nn.BatchNorm2d(128),
         )
 
+        # self.fully_connected = nn.Sequential(
+        #     nn.Linear(128*(16*16), 1024),
+        #     nn.ReLU(),
+        #     nn.Linear(1024,512),
+        #     nn.ReLU(),
+        #     nn.Linear(512,256),
+        #     nn.ReLU(),
+        #     nn.Linear(256, 128),
+        #     nn.ReLU(),
+        #     nn.Linear(128, 64),
+        #     nn.ReLU(),
+        #     nn.Linear(64, 1),
+        #     nn.LogSoftmax(dim=1)
+        # )
         self.fully_connected = nn.Sequential(
-            nn.Linear(128*(16*16), 1024),
+            nn.Linear(16*16*128, 512),
             nn.ReLU(),
-            nn.Linear(1024,512),
+            nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Linear(512,256),
+            nn.Linear(256,100),
             nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1),
-            nn.LogSoftmax(dim=1)
+            nn.Linear(100,2),
+            nn.LogSigmoid()
         )
 
 
@@ -226,5 +238,6 @@ models = {
 if __name__ == "__main__":
 
     # model = SimpleCNN()
-    model = ResNet()
+    # model = ResNet()
+    model = TestCNN()
     print(model.name)

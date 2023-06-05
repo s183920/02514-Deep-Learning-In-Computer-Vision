@@ -11,32 +11,31 @@ from torch.utils.data import DataLoader
 import random
 
 class HotdogDataset(datasets.ImageFolder):
-    
+
     def __init__(self, train = True, transform = None, *args, **kwargs):
         # self.datadir = 'hotdog/small_data/' + ('train' if train else 'test')
         self.datadir = '/dtu/datasets1/02514/hotdog_nothotdog/' + ('train' if train else 'test')
         transform = transform if transform else self.default_transform
         super().__init__(self.datadir, transform=transform, *args, **kwargs)
-        
+
     @property
     def default_transform(self):
         return transforms.Compose([
             transforms.Resize((128, 128)),
             transforms.RandomRotation(random.randint(0,70)),
             #transforms.ColorJitter(brightness=.5, hue=.3),
-            transforms.RandomPerspective(distortion_scale=0.6, p = 0.4),
+            # transforms.RandomPerspective(distortion_scale=0.6, p = 0.4),
             transforms.RandomHorizontalFlip(p=0.3),
             transforms.RandomEqualize(),
             transforms.ToTensor(),
         ])
-        
+
     def get_dataloader(self, batch_size = 32, shuffle = True, *args, **kwargs):
         # DataLoader(testset, batch_size=batch_size, shuffle=False)
         return DataLoader(self, batch_size=batch_size, shuffle=shuffle, *args, **kwargs)
-    
+
     def transform_label(self, label):
         return self.classes[label]
-    
 
 
 
@@ -44,7 +43,8 @@ class HotdogDataset(datasets.ImageFolder):
 
 
 
-    
+
+
 if __name__ == "__main__":
     dataset = HotdogDataset()
     images, labels = next(iter(dataset.get_dataloader(batch_size=21, shuffle=False)))
@@ -55,11 +55,5 @@ if __name__ == "__main__":
         plt.imshow(images[i].numpy().transpose(1,2,0))
         plt.title(dataset.transform_label(labels[i].item()))
         plt.axis('off')
-    
+
     plt.savefig('hotdog_overview.png')
-
-    
-
-
-
-
