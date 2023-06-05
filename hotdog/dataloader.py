@@ -13,9 +13,14 @@ class HotdogDataset(datasets.ImageFolder):
     
     def __init__(self, train = True, transform = None, *args, **kwargs):
         # self.datadir = 'hotdog/small_data/' + ('train' if train else 'test')
+        self.train = train
         self.datadir = '/dtu/datasets1/02514/hotdog_nothotdog/' + ('train' if train else 'test')
         transform = transform if transform else self.default_transform
         super().__init__(self.datadir, transform=transform, *args, **kwargs)
+        
+        if self.train:
+            self.train_subset, self.val_subset = torch.utils.data.random_split(
+        self, [0.8, 0.2], generator=torch.Generator().manual_seed(1))
         
     @property
     def default_transform(self):
@@ -24,9 +29,15 @@ class HotdogDataset(datasets.ImageFolder):
             transforms.ToTensor(),
         ])
         
-    def get_dataloader(self, batch_size = 32, shuffle = True, *args, **kwargs):
+    def get_dataloader(self, batch_size = 32, *args, **kwargs):
+        if self.train:
+            train_loader = DataLoader(dataset=self.train_subset, shuffle=True, batch_size=batch_size, *args, **kwargs)
+            val_loader = DataLoader(dataset=self.val_subset, shuffle=False, batch_size=batch_size, *args, **kwargs)
+            return train_loader, val_loader
+        else:
+            return DataLoader(self, batch_size=batch_size, shuffle=False, *args, **kwargs)
         # DataLoader(testset, batch_size=batch_size, shuffle=False)
-        return DataLoader(self, batch_size=batch_size, shuffle=shuffle, *args, **kwargs)
+        
     
     def transform_label(self, label):
         return self.classes[label]
