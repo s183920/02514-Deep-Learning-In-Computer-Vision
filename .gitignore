@@ -161,3 +161,5 @@ cython_debug/
 exercises/ex1/data/*
 exercises/ex1/cifar10_data/*
 hotdog/data/*
+hotdog/logs/*
+logs/*
