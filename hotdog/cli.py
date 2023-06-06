@@ -24,17 +24,27 @@ parser.add_argument("-mode", default = "train", choices = ["train", "test"], hel
 # classifier args
 parser.add_argument("--name", default = None, type = str, help = "Name of the model")
 parser.add_argument('--show-test-images', action='store_true', default=False)
-parser.add_argument("--model", type = str, default = "SimpleCNN", help = "Model to use for classification")
+parser.add_argument("--model", type = str, default = None, help = "Model to use for classification")
 parser.add_argument("--use_wandb", action='store_true', default=True)
 
 # config args
 parser.add_argument("--optimizer", type = str, action=AddToDict, dest = "config", help = "Optimizer")
 parser.add_argument("--loss_fun", type = str, action=AddToDict, dest = "config", help = "Loss function")
-parser.add_argument("--lr", type = float, action=AddToDict, dest = "config", help = "Learning rate")
 parser.add_argument("--num_epochs", type = int, action=AddToDict, dest = "config", help = "Batch size")
+parser.add_argument("--dropout", type = float, action=AddToDict, dest = "config", help = "Dropout")
+parser.add_argument("--batchnorm", type = bool, action=AddToDict, dest = "config", help = "Batchnorm")
+
+# optimizer kwargs
+parser.add_argument("--lr", type = float, action=AddToDict, dest = "optimizer_kwargs", help = "Learning rate")
+
+# train dataset kwargs
+parser.add_argument("--data_augmentation", type = bool, action=AddToDict, dest = "train_dataset_kwargs", help = "Data augmentation")
 
 # parse args
 args = parser.parse_args()
+args.config = {} if args.config is None else args.config
+args.config["optimizer_kwargs"] = {} if args.optimizer_kwargs is None else args.optimizer_kwargs
+args.config["train_dataset_kwargs"] = {} if args.train_dataset_kwargs is None else args.train_dataset_kwargs
 
 # create classifier
 classifier = HotdogClassifier(name = args.name, show_test_images=args.show_test_images, use_wandb=args.use_wandb, model=args.model, **args.config)

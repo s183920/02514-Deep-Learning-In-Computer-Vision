@@ -31,6 +31,27 @@ class SimpleCNN(nn.Module):
     @property
     def name(self):
         return "SimpleCNN"
+    
+
+class NewCNN(nn.Module):
+    def __init__(self):
+        super(NewCNN, self).__init__()
+        
+        
+        self.convolutional = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=224, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=224, out_channels=16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+        )
+        
+        self.fc = nn.Sequential(
+            nn.Linear(16*224*224, 256),
+            nn.ReLU(),
+            nn.Linear(256, 2),
+            nn.LogSigmoid()
+        )
+    
 
 
 
@@ -80,7 +101,7 @@ class ResNet(nn.Module):
         x = self.ResNet_blocks(x)
         x = x.view(x.size(0), -1)    #reshape x so it becomes flat, except for the first dimension (which is the minibatch)
         out = self.fc(x)
-        return out#.view(-1).float()
+        return out
 
 
     @property
@@ -167,6 +188,7 @@ class ResNet(nn.Module):
 class TestCNN(nn.Module):
     def __init__(self):
         super(TestCNN, self).__init__()
+        
         self.convolutional = nn.Sequential(
             nn.Conv2d(in_channels = 3, out_channels = 16, kernel_size=3, stride = 1, padding = 1),
             nn.ReLU(),
@@ -176,26 +198,38 @@ class TestCNN(nn.Module):
             nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 1),
             nn.ReLU(),
             nn.MaxPool2d(2),
+            nn.Dropout(0.5),
             nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 1),
             nn.ReLU(),
             nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 1),
             nn.ReLU(),
-            nn.MaxPool2d(2)
+            nn.MaxPool2d(2),
+            nn.BatchNorm2d(128),
         )
 
+        # self.fully_connected = nn.Sequential(
+        #     nn.Linear(128*(16*16), 1024),
+        #     nn.ReLU(),
+        #     nn.Linear(1024,512),
+        #     nn.ReLU(),
+        #     nn.Linear(512,256),
+        #     nn.ReLU(),
+        #     nn.Linear(256, 128),
+        #     nn.ReLU(),
+        #     nn.Linear(128, 64),
+        #     nn.ReLU(),
+        #     nn.Linear(64, 1),
+        #     nn.LogSoftmax(dim=1)
+        # )
         self.fully_connected = nn.Sequential(
-            nn.Linear(128*(16*16), 1024),
+            nn.Linear(16*16*128, 512),
             nn.ReLU(),
-            nn.Linear(1024,512),
+            nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Linear(512,256),
+            nn.Linear(256,100),
             nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1),
-            nn.LogSoftmax(dim=1)
+            nn.Linear(100,2),
+            nn.LogSigmoid()
         )
 
 
@@ -210,6 +244,57 @@ class TestCNN(nn.Module):
     @property
     def name(self):
         return "TestCNN"
+    
+    
+class LukasCNN(nn.Module):
+    def __init__(self, dropout = 0.5, batchnorm = True):
+        super(LukasCNN, self).__init__()
+        
+        self.convolutional = nn.Sequential(
+            nn.Conv2d(in_channels = 3, out_channels = 16, kernel_size=3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels = 16, out_channels = 16, kernel_size = 3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Dropout(dropout),
+            nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+        )
+        
+        self.batchnorm_layer = nn.Sequential(nn.BatchNorm2d(128),) if batchnorm else nn.Sequential()
+
+   
+        self.fully_connected = nn.Sequential(
+            nn.Linear(16*16*128, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256,100),
+            nn.ReLU(),
+            nn.Linear(100,2),
+            nn.LogSigmoid()
+        )
+
+
+    def forward(self, x):
+        x = self.convolutional(x)
+        x = self.batchnorm_layer(x)
+        #reshape x so it becomes flat, except for the first dimension (which is the minibatch)
+        x = x.view(x.size(0), -1)
+        x = self.fully_connected(x)
+        return x
+
+
+    @property
+    def name(self):
+        return "LukasCNN"
+
 
 
 
@@ -217,7 +302,8 @@ class TestCNN(nn.Module):
 models = {
     "SimpleCNN": SimpleCNN,
     "ResNet": ResNet,
-    "TestCNN": TestCNN
+    "TestCNN": TestCNN,
+    "LukasCNN": LukasCNN,
 }
 
 
@@ -226,5 +312,6 @@ models = {
 if __name__ == "__main__":
 
     # model = SimpleCNN()
-    model = ResNet()
+    # model = ResNet()
+    model = TestCNN()
     print(model.name)

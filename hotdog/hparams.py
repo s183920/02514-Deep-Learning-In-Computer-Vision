@@ -11,10 +11,14 @@ wandb_defaults = {
 }
 
 default_config = {
-    "model"	: "SimpleCNN",
+    # "model"	: "SimpleCNN",
 	"optimizer" : "Adam",
 	"loss_fun" : "CrossEntropyLoss",
 	"num_epochs" : 10,
+	### model params
+	"dropout": 0.5,
+	"batchnorm": True,
+	# kwargs
 	"optimizer_kwargs" : {},
 	"train_dataset_kwargs" : {},
 	"test_dataset_kwargs" : {},
@@ -28,11 +32,16 @@ sweep_defaults = {
     # 'name': 'sweep',
     'metric': {
         'goal': 'maximize', 
-        'name': 'Validation metrics/test_acc'
+        'name': 'Validation metrics/val_acc'
         },
     'parameters': {
+        'optimizer': {"values" : [ 'Adam', 'SGD' ]},
+        'lr': {'min': 0.0001, 'max': 0.1},
+        'data_augmentation': {'values': [True, False]},
+        'batchnorm': {'values': [True, False]},
+        'dropout': {'values': [0.0, 0.25, 0.5]},
         # 'batch_size': {'values': [16, 32, 64]},
-        'num_epochs': {'max': 20, "min": 1, "distribution" : "int_uniform"},
+        # 'num_epochs': {'max': 20, "min": 1, "distribution" : "int_uniform"},
         # 'lr': {'max': 0.1, 'min': 0.0001}
      },
     # "early_terminate": {
