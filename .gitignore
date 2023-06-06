@@ -163,3 +163,4 @@ exercises/ex1/cifar10_data/*
 hotdog/data/*
 logs/*
 hotdog/logs/*
+*wandb*

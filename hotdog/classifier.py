@@ -13,7 +13,7 @@ from utils import data_to_img_array, download_model
 from datetime import datetime as dt
 
 class HotdogClassifier:
-    def __init__(self, name = None, model = "SimpleCNN", config = None, use_wandb = True, verbose = True, show_test_images = False, **kwargs):
+    def __init__(self, name = None, model = None, config = None, use_wandb = True, verbose = True, show_test_images = False, **kwargs):
         """
         Class for training and testing a hotdog classifier
 
@@ -47,7 +47,7 @@ class HotdogClassifier:
         self.test_images = []
 
         # set model
-        self.set_model(model)
+        self.set_model("LukasCNN" if model is None else model)
 
         # set wandb
         if use_wandb:
@@ -71,7 +71,7 @@ class HotdogClassifier:
         model = models.get(model) 
         if model is None:
             raise ValueError(f"Model not found")
-        self.model = model()
+        self.model = model(dropout = self.config["dropout"], batchnorm = self.config["batchnorm"])
         self.model.to(self.device)
 
 
@@ -85,6 +85,7 @@ class HotdogClassifier:
     def set_optimizer(self):
         optimizer = self.config.get("optimizer")
         self.optimizer = torch.optim.__dict__.get(optimizer)(self.model.parameters(), **self.config.get("optimizer_kwargs", {}))
+        # self.optimizer = torch.optim.__dict__.get(optimizer)(self.model.parameters(), )
 
     def save_model(self, path, epoch):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -198,12 +199,14 @@ class HotdogClassifier:
                 self.wandb_run.log({
                     "Train metrics/train_acc":    train_acc,
                     "Train metrics/train_loss":   train_loss,
-                    "Validation metrics/test_acc":     val_acc,
-                    "Validation metrics/test_loss":    val_loss,
-                    "epoch":        epoch+1,
+                    "Validation metrics/val_acc":     val_acc,
+                    "Validation metrics/val_loss":    val_loss,
+                    "epoch":        epoch,
                     "test_images":  self.test_images,
                 })
             
+            # clear cache
+            # self.clear_cache()
             
             
     def test(self, validation = False):       
@@ -325,6 +328,8 @@ class HotdogClassifier:
         # wandb.agent(sweep_id, function=self.train, count=4)
         os.system(f"wandb agent {sweep_id}")
 
+    def clear_cache(self):
+        os.system("rm -rf ~/.cache/wandb")
 
 
 if __name__ == "__main__":

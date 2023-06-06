@@ -12,28 +12,42 @@ import random
 
 class HotdogDataset(datasets.ImageFolder):
 
-    def __init__(self, train = True, transform = None, *args, **kwargs):
+    def __init__(self, train = True, transform = None, data_augmentation = True, *args, **kwargs):
+        # set datadir
         # self.datadir = 'hotdog/small_data/' + ('train' if train else 'test')
-        self.train = train
         self.datadir = '/dtu/datasets1/02514/hotdog_nothotdog/' + ('train' if train else 'test')
+        
+        # set values
+        self.img_size = (128, 128)
+        self.train = train
+        self.data_augmentation = data_augmentation
         transform = transform if transform else self.default_transform
+        
+        # call super
         super().__init__(self.datadir, transform=transform, *args, **kwargs)
         
+        # split train and val
         if self.train:
             self.train_subset, self.val_subset = torch.utils.data.random_split(
         self, [0.8, 0.2], generator=torch.Generator().manual_seed(1))
         
     @property
     def default_transform(self):
-        return transforms.Compose([
-            transforms.Resize((128, 128)),
-            transforms.RandomRotation(random.randint(0,70)),
-            #transforms.ColorJitter(brightness=.5, hue=.3),
-            # transforms.RandomPerspective(distortion_scale=0.6, p = 0.4),
-            transforms.RandomHorizontalFlip(p=0.3),
-            transforms.RandomEqualize(),
-            transforms.ToTensor(),
-        ])
+        if self.train and self.data_augmentation:
+            return transforms.Compose([
+                transforms.Resize(self.img_size),
+                transforms.RandomRotation(random.randint(0,35)),
+                #transforms.ColorJitter(brightness=.5, hue=.3),
+                # transforms.RandomPerspective(distortion_scale=0.6, p = 0.4),
+                transforms.RandomHorizontalFlip(p=0.3),
+                transforms.RandomEqualize(),
+                transforms.ToTensor(),
+            ])
+        else:
+            return transforms.Compose([
+                transforms.Resize(self.img_size),
+                transforms.ToTensor(),
+            ])
         
     def get_dataloader(self, batch_size = 32, *args, **kwargs):
         if self.train:
