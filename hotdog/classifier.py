@@ -75,7 +75,7 @@ class HotdogClassifier:
 
         # set model
         print(f"Setting model to {model}")
-        self.set_model("LukasCNN" if model is None else model)
+        self.set_model("SimpleCNN" if model is None else model)
         print(f"Model set to {self.model}")
 
         # set wandb
@@ -123,7 +123,8 @@ class HotdogClassifier:
         
         
         if self.config.get("use_scheduler", True):
-            self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, gamma=0.1, step_size = int(5+0.2*self.config["num_epochs"]))
+            # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, gamma=0.1, step_size = int(5+0.2*self.config["num_epochs"]))
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=0, eps=1e-08, verbose=False)
         else:
             self.scheduler = None
 
