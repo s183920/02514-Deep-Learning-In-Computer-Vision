@@ -36,11 +36,11 @@ class HotdogDataset(datasets.ImageFolder):
         if self.train and self.data_augmentation:
             return transforms.Compose([
                 transforms.Resize(self.img_size),
-                transforms.RandomRotation(random.randint(0,35)),
+                #transforms.RandomRotation(random.randint(0,35)),
                 #transforms.ColorJitter(brightness=.5, hue=.3),
                 # transforms.RandomPerspective(distortion_scale=0.6, p = 0.4),
                 transforms.RandomHorizontalFlip(p=0.3),
-                transforms.RandomEqualize(),
+                #transforms.RandomEqualize(),
                 transforms.ToTensor(),
             ])
         else:
@@ -49,7 +49,7 @@ class HotdogDataset(datasets.ImageFolder):
                 transforms.ToTensor(),
             ])
         
-    def get_dataloader(self, batch_size = 32, *args, **kwargs):
+    def get_dataloader(self, batch_size = 64, *args, **kwargs):
         if self.train:
             train_loader = DataLoader(dataset=self.train_subset, shuffle=True, batch_size=batch_size, *args, **kwargs)
             val_loader = DataLoader(dataset=self.val_subset, shuffle=False, batch_size=batch_size, *args, **kwargs)

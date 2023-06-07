@@ -294,6 +294,159 @@ class LukasCNN(nn.Module):
     @property
     def name(self):
         return "LukasCNN"
+    
+
+class PeetzCNN(nn.Module):
+    def __init__(self, dropout = 0.5, batchnorm = True):
+        super(PeetzCNN, self).__init__()
+        
+        self.convolutional = nn.Sequential(
+            nn.Conv2d(in_channels = 3, out_channels = 16, kernel_size=5, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels = 16, out_channels = 16, kernel_size = 5, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 5, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Dropout(dropout),
+            nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 5, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 5, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+        )
+        
+        self.batchnorm_layer = nn.Sequential(nn.BatchNorm2d(128),) if batchnorm else nn.Sequential()
+
+   
+        self.fully_connected = nn.Sequential(
+            nn.Linear(12*12*128, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256,100),
+            nn.ReLU(),
+            nn.Linear(100,2),
+            nn.LogSigmoid()
+        )
+
+
+    def forward(self, x):
+        x = self.convolutional(x)
+        x = self.batchnorm_layer(x)
+        #reshape x so it becomes flat, except for the first dimension (which is the minibatch)
+        x = x.view(x.size(0), -1)
+        x = self.fully_connected(x)
+        return x
+
+
+    @property
+    def name(self):
+        return "PeetzCNN"
+    
+
+
+class PeetzCNN(nn.Module):
+    def __init__(self, dropout = 0.5, batchnorm = True):
+        super(PeetzCNN, self).__init__()
+        
+        self.convolutional = nn.Sequential(
+            nn.Conv2d(in_channels = 3, out_channels = 16, kernel_size=5, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels = 16, out_channels = 16, kernel_size = 5, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 5, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Dropout(dropout),
+            nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 5, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 5, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+        )
+        
+        self.batchnorm_layer = nn.Sequential(nn.BatchNorm2d(128),) if batchnorm else nn.Sequential()
+
+   
+        self.fully_connected = nn.Sequential(
+            nn.Linear(12*12*128, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256,100),
+            nn.ReLU(),
+            nn.Linear(100,2),
+            nn.LogSigmoid()
+        )
+
+
+    def forward(self, x):
+        x = self.convolutional(x)
+        x = self.batchnorm_layer(x)
+        #reshape x so it becomes flat, except for the first dimension (which is the minibatch)
+        x = x.view(x.size(0), -1)
+        x = self.fully_connected(x)
+        return x
+
+
+    @property
+    def name(self):
+        return "PeetzCNN"
+
+
+
+class PeetzCNN_threee(nn.Module):
+    def __init__(self, dropout = 0.5, batchnorm = True):
+        super(PeetzCNN_threee, self).__init__()
+        
+        self.convolutional = nn.Sequential(
+            nn.Conv2d(in_channels = 3, out_channels = 16, kernel_size=3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels = 16, out_channels = 16, kernel_size = 3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+        )
+        
+        self.batchnorm_layer = nn.Sequential(nn.BatchNorm2d(128),) if batchnorm else nn.Sequential()
+
+   
+        self.fully_connected = nn.Sequential(
+            nn.Linear(16*16*128, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256,100),
+            nn.ReLU(),
+            nn.Linear(100,2),
+            nn.LogSigmoid()
+        )
+
+
+    def forward(self, x):
+        x = self.convolutional(x)
+        x = self.batchnorm_layer(x)
+        #reshape x so it becomes flat, except for the first dimension (which is the minibatch)
+        x = x.view(x.size(0), -1)
+        x = self.fully_connected(x)
+        return x
+
+
+    @property
+    def name(self):
+        return "PeetzCNN_three"
+
 
 
 
@@ -304,6 +457,8 @@ models = {
     "ResNet": ResNet,
     "TestCNN": TestCNN,
     "LukasCNN": LukasCNN,
+    "PeetzCNN": PeetzCNN,
+    "PeetzCNN_three": PeetzCNN_threee,
 }
 
 
