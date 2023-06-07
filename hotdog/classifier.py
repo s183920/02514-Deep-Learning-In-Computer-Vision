@@ -295,7 +295,12 @@ class HotdogClassifier:
             
     def test(self, validation = False, save_images = 0):  
         if save_images > 0:
-            self.test_images = {"true_positive" : torch.empty(10, 3, 128, 128), "true_negative" : torch.empty(10, 3, 128, 128), "false_positive" : torch.empty(10, 3, 128, 128), "false_negative" : torch.empty(10, 3, 128, 128)}
+            self.test_images = {
+                "true_positive" : torch.empty(save_images, 3, 128, 128), 
+                "true_negative" : torch.empty(save_images, 3, 128, 128), 
+                "false_positive" : torch.empty(save_images, 3, 128, 128), 
+                "false_negative" : torch.empty(save_images, 3, 128, 128)
+            }
              
         if validation:
             data_loader = self.val_loader
@@ -477,9 +482,11 @@ class HotdogClassifier:
 
 
 if __name__ == "__main__":
-    # classifier = HotdogClassifier(project="HotdogModels", name = "Resnet_feature_extractor", show_test_images=False, model = "Resnet18", use_wandb=True, finetune =False)
+    classifier = HotdogClassifier(project="HotdogModels", name = "SimpleCNN", 
+                                  show_test_images=False, model = "SimpleCNN", use_wandb=True, 
+                                  batchnorm = False, dropout = 0, data_augmentation = True, optimizer = "Adam",)
     # classifier.dev_mode = True
-    # classifier.train(num_epochs=100)
+    classifier.train(num_epochs=100)
     # classifier.sweep()
 
 
@@ -488,10 +495,3 @@ if __name__ == "__main__":
     
     
     
-    model = "SimpleCNN"
-    trained_model = "wandb:deepcomputer/grid_search/run_2023-06-07_10-14-16_model:v8"
-    classifier = HotdogClassifier(model = model, use_wandb=False)
-    classifier.load_model(trained_model)
-    classifier.test(save_images=2)
-    # classifier.saliency_map(classifier.test_images["false_positive"][0])
-    classifier.saliency_map("false_positive", img_idx = 0)

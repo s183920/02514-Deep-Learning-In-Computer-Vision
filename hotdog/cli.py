@@ -49,7 +49,7 @@ args.config["optimizer_kwargs"] = {} if args.optimizer_kwargs is None else args.
 args.config["train_dataset_kwargs"] = {} if args.train_dataset_kwargs is None else args.train_dataset_kwargs
 
 # create classifier
-classifier = HotdogClassifier(name = args.name, show_test_images=args.show_test_images, use_wandb=args.use_wandb, model=args.model, **args.config)
+classifier = HotdogClassifier(name = args.name, project=args.project, show_test_images=args.show_test_images, use_wandb=args.use_wandb, model=args.model, **args.config)
 
 if args.mode == "train":
     classifier.train()
