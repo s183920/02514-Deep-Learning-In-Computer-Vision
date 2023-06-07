@@ -3,7 +3,7 @@ program: hotdog/cli.py
 method: bayes
 metric:
   goal: maximize
-  name: Validation metrics/val_acc
+  name: Best validation accuracy
 parameters:
   optimizer:
     values:

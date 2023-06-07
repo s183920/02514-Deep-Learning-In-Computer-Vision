@@ -14,10 +14,11 @@ default_config = {
     # "model"	: "SimpleCNN",
 	"optimizer" : "Adam",
 	"loss_fun" : "CrossEntropyLoss",
-	"num_epochs" : 10,
+	"num_epochs" : 25,
 	### model params
 	"dropout": 0.5,
 	"batchnorm": True,
+	"finetune": False,
 	# kwargs
 	"optimizer_kwargs" : {},
 	"train_dataset_kwargs" : {},
