@@ -1,5 +1,6 @@
 import torch
 from torch.nn import functional as F
+import torchvision
 from model import models
 from dataloader import HotdogDataset
 from tqdm import tqdm
@@ -13,7 +14,7 @@ from utils import data_to_img_array, download_model
 from datetime import datetime as dt
 
 class HotdogClassifier:
-    def __init__(self, name = None, model = None, config = None, use_wandb = True, verbose = True, show_test_images = False, **kwargs):
+    def __init__(self, name = None, model = None, config = None, use_wandb = True, verbose = True, show_test_images = False, model_save_freq = None, **kwargs):
         """
         Class for training and testing a hotdog classifier
 
@@ -29,8 +30,33 @@ class HotdogClassifier:
             Whether to print progress, by default True
         show_test_images : bool, optional
             Whether to show test images, by default False
+        model_save_freq : int, optional
+            How often to save the model, by default None
+            None means only save the best model
         **kwargs : dict
             Additional arguments to config
+            
+        Config
+        ------
+        num_epochs : int
+            Number of epochs to train
+        dropout : float
+            Dropout rate
+        batchnorm : bool
+            Whether to use batchnormalisation
+        train_dataset_kwargs : dict
+            Additional arguments to HotdogDataset for training
+            i.e. train_dataset_kwargs = {"data_augmentation": False}
+        test_dataset_kwargs : dict
+            Additional arguments to HotdogDataset for testing
+        optimizer : str
+            Optimizer to use (from torch.optim)
+        optimizer_kwargs : dict
+            Additional arguments to optimizer
+            e.g. optimizer_kwargs = {"lr": 0.01}
+        scheduler : bool
+            Whether to use a scheduler - will use ExponentialLR with gamma = 0.1
+            Decrease will happen after 20 % of epochs
         """
 
         # set info
@@ -38,6 +64,7 @@ class HotdogClassifier:
         self.verbose = verbose
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.show_test_images = show_test_images
+        self.model_save_freq = model_save_freq
 
         # set init values
         self.config = config if config is not None else default_config
@@ -47,7 +74,9 @@ class HotdogClassifier:
         self.test_images = []
 
         # set model
-        self.set_model("LukasCNN" if model is None else model)
+        print(f"Setting model to {model}")
+        self.set_model("SimpleCNN" if model is None else model)
+        print(f"Model set to {self.model}")
 
         # set wandb
         if use_wandb:
@@ -68,10 +97,15 @@ class HotdogClassifier:
         
     def set_model(self, model):
         print(f"Setting model to {model}")
-        model = models.get(model) 
-        if model is None:
-            raise ValueError(f"Model not found")
-        self.model = model(dropout = self.config["dropout"], batchnorm = self.config["batchnorm"])
+        
+        if model.lower() == "resnet18":
+            self.model = torchvision.models.resnet18(weights='IMAGENET1K_V1')
+            self.model.name = "resnet18"
+        else:
+            model = models.get(model)
+            if model is None:
+                raise ValueError(f"Model not found")
+            self.model = model(dropout = self.config["dropout"], batchnorm = self.config["batchnorm"])
         self.model.to(self.device)
 
 
@@ -86,6 +120,13 @@ class HotdogClassifier:
         optimizer = self.config.get("optimizer")
         self.optimizer = torch.optim.__dict__.get(optimizer)(self.model.parameters(), **self.config.get("optimizer_kwargs", {}))
         # self.optimizer = torch.optim.__dict__.get(optimizer)(self.model.parameters(), )
+        
+        
+        if self.config.get("use_scheduler", True):
+            # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, gamma=0.1, step_size = int(5+0.2*self.config["num_epochs"]))
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=0, eps=1e-08, verbose=False)
+        else:
+            self.scheduler = None
 
     def save_model(self, path, epoch):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -134,6 +175,9 @@ class HotdogClassifier:
 
         # set optimizer
         self.set_optimizer()
+        
+        # set best acc
+        self.best_val_acc = 0
 
 
     def train_step(self, data, target):
@@ -184,13 +228,24 @@ class HotdogClassifier:
             train_acc = train_correct/len(self.data_train)*100
             if self.verbose:
                 print("Accuracy train: {train:.1f}%".format(train=train_acc))
-
-
-            # # Save model
-            self.save_model(f"logs/Hotdog/models/{self.name}.pth", epoch)
+            
+            
+            # take step in scheduler
+            if self.scheduler:
+                if self.wandb_run is not None:
+                    self.wandb_run.log({"Learning rate" : self.scheduler.get_last_lr()[0]}, commit = False)
+                self.scheduler.step()
             
             # test 
             val_acc, val_loss, conf_mat = self.test(validation=True)
+            
+            # Save model
+            if self.model_save_freq is None:
+                if val_acc > self.best_val_acc:
+                    self.best_val_acc = val_acc
+                    self.save_model(f"logs/Hotdog/models/{self.name}.pth", epoch)
+            elif epoch % self.model_save_freq == 0:
+                self.save_model(f"logs/Hotdog/models/{self.name}.pth", epoch)
             
             
             # log to wandb
@@ -206,7 +261,7 @@ class HotdogClassifier:
                 })
             
             # clear cache
-            # self.clear_cache()
+            self.clear_cache()
             
             
     def test(self, validation = False):       
@@ -333,7 +388,7 @@ class HotdogClassifier:
 
 
 if __name__ == "__main__":
-    classifier = HotdogClassifier(show_test_images=False, model = "ResNet")
+    classifier = HotdogClassifier(show_test_images=False, model = "Resnet18")
     # classifier.dev_mode = True
     classifier.train(num_epochs=10)
     # classifier.sweep()

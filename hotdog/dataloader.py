@@ -16,24 +16,27 @@ class HotdogDataset(datasets.ImageFolder):
         # set datadir
         # self.datadir = 'hotdog/small_data/' + ('train' if train else 'test')
         self.datadir = '/dtu/datasets1/02514/hotdog_nothotdog/' + ('train' if train else 'test')
-        
+
         # set values
         self.img_size = (128, 128)
         self.train = train
         self.data_augmentation = data_augmentation
         transform = transform if transform else self.default_transform
-        
+
         # call super
         super().__init__(self.datadir, transform=transform, *args, **kwargs)
-        
+
         # split train and val
         if self.train:
             self.train_subset, self.val_subset = torch.utils.data.random_split(
         self, [0.8, 0.2], generator=torch.Generator().manual_seed(1))
-        
+
+
+
     @property
     def default_transform(self):
         if self.train and self.data_augmentation:
+
             return transforms.Compose([
                 transforms.Resize(self.img_size),
                 transforms.RandomRotation(random.randint(0,35)),
@@ -42,13 +45,21 @@ class HotdogDataset(datasets.ImageFolder):
                 transforms.RandomHorizontalFlip(p=0.3),
                 transforms.RandomEqualize(),
                 transforms.ToTensor(),
+                # transforms.Normalize(mean=[self.mean[0], self.mean[1], self.mean[2]],
+                #                         std=[self.std[0], self.std[1], self.std[2]])
+                transforms.Normalize(mean = [0.5225634,0.44118169,0.35845589], std = [0.22521636,0.22928182,0.233647])
             ])
         else:
             return transforms.Compose([
                 transforms.Resize(self.img_size),
                 transforms.ToTensor(),
+                # transforms.Normalize(mean=[self.mean[0], self.mean[1], self.mean[2]],
+                #                         std=[self.std[0], self.std[1], self.std[2]])
+                transforms.Normalize(mean = [0.5225634,0.44118169,0.35845589], std = [0.22521636,0.22928182,0.233647])
             ])
-        
+
+
+
     def get_dataloader(self, batch_size = 32, *args, **kwargs):
         if self.train:
             train_loader = DataLoader(dataset=self.train_subset, shuffle=True, batch_size=batch_size, *args, **kwargs)
@@ -57,8 +68,8 @@ class HotdogDataset(datasets.ImageFolder):
         else:
             return DataLoader(self, batch_size=batch_size, shuffle=False, *args, **kwargs)
         # DataLoader(testset, batch_size=batch_size, shuffle=False)
-        
-    
+
+
     def transform_label(self, label):
         return self.classes[label]
 
