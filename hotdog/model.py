@@ -457,34 +457,29 @@ class PeetzCNNLinearDropout(nn.Module):
             nn.Conv2d(in_channels = 3, out_channels = 16, kernel_size=3, stride = 1, padding = 1),
             nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(in_channels = 16, out_channels = 16, kernel_size = 3, stride = 1, padding = 1),
-            nn.ReLU(),
             nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 1),
             nn.ReLU(),
-            nn.MaxPool2d(2),
             nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 1),
             nn.ReLU(),
-            #nn.MaxPool2d(2),
+            nn.MaxPool2d(2),
             nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels = 128, out_channels = 256, kernel_size = 3, stride = 1, padding = 1),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
         
-        self.batchnorm_layer = nn.Sequential(nn.BatchNorm2d(128),) if batchnorm else nn.Sequential()
+        self.batchnorm_layer = nn.Sequential(nn.BatchNorm2d(256),) if batchnorm else nn.Sequential()
 
    
         self.fully_connected = nn.Sequential(
-            nn.Linear(32*32*128, 1024),
+            nn.Linear(16*16*256, 256),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(1024, 512), 
+            nn.Linear(256,50),
             nn.ReLU(),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(256,100),
-            nn.ReLU(),
-            nn.Linear(100,2),
+            nn.Linear(50,2),
             nn.LogSigmoid()
         )
 
