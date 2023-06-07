@@ -36,8 +36,8 @@ class HotdogDataset(datasets.ImageFolder):
         if self.train and self.data_augmentation:
             return transforms.Compose([
                 transforms.Resize(self.img_size),
-                transforms.RandomRotation(random.randint(0,35)),
-                transforms.ColorJitter(brightness=.5, hue=.3),
+                #transforms.RandomRotation(random.randint(0,35)),
+                #transforms.ColorJitter(brightness=.5, hue=.3),
                 transforms.RandomHorizontalFlip(p=0.3),
                 transforms.RandomVerticalFlip(p=0.3),
                 transforms.ToTensor(),
