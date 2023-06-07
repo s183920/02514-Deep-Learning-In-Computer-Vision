@@ -8,8 +8,14 @@ import os
 from hparams import wandb_defaults, default_config, sweep_defaults
 import wandb
 from PIL import Image as PILImage
+from torchcam.utils import overlay_mask
+from torchcam.methods import SmoothGradCAMpp, LayerCAM
+from torchvision.transforms.functional import normalize, resize, to_pil_image
+import matplotlib.pyplot as plt
+import numpy as np
 
-from utils import data_to_img_array, download_model, ReduceLROnPlateau
+
+from utils import data_to_img_array, download_model, ReduceLROnPlateau, inverse_normalize
 
 from datetime import datetime as dt
 
@@ -175,7 +181,8 @@ class HotdogClassifier:
 
     def prepare(self, cuda_device):
         # set seed
-        torch.manual_seed(self.config.get("seed", 0))
+        if self.config.get("seed") is not None:
+            torch.manual_seed(self.config.get("seed", 0))
 
         # set visible cuda devices
         if self.device.type == "cuda":
@@ -439,14 +446,52 @@ class HotdogClassifier:
 
     def clear_cache(self):
         os.system("rm -rf ~/.cache/wandb")
+        
+    def saliency_map(self, classification_result, img_idx = 0, ax = None, layer = "convolutional"):
+        assert classification_result in ["true_positive", "true_negative", "false_positive", "false_negative"]
+        
+        data = inverse_normalize(self.test_images[classification_result])
+        
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            
+        # Set your CAM extractor
+        cam_extractor = SmoothGradCAMpp(self.model, target_layer=layer) # layer 4 is the last conv layer of the model
+        # cam_extractor = SmoothGradCAMpp(self.model, target_layer='fc')
+        # get your input
+        input_tensor = data[img_idx].unsqueeze(0).to(self.device)
+
+        out = self.model(input_tensor)
+        # Retrieve the CAM by passing the class index and the model output
+        cams = cam_extractor(out.squeeze(0).argmax().item(), out)
+        
+        # img = images[0]
+        # img = tp_imgs[0]
+        img = data_to_img_array(data)[img_idx]
+        for name, cam in zip(cam_extractor.target_names, cams):
+            # result = overlay_mask(to_pil_image(img, mode = "RGB"), to_pil_image(cam.squeeze(0), mode='F'), alpha=0.5)
+            result = overlay_mask(PILImage.fromarray(img.astype(np.uint8)), to_pil_image(cam.squeeze(0), mode='F'), alpha=0.6)
+            ax.imshow(result); ax.set_axis_off(); 
+            # ax.set_title(name)
+        cam_extractor.remove_hooks()
 
 
 if __name__ == "__main__":
-    classifier = HotdogClassifier(project="HotdogModels", name = "Resnet_finetune", show_test_images=False, model = "Resnet18", use_wandb=True, finetune =True)
+    # classifier = HotdogClassifier(project="HotdogModels", name = "Resnet_feature_extractor", show_test_images=False, model = "Resnet18", use_wandb=True, finetune =False)
     # classifier.dev_mode = True
-    classifier.train(num_epochs=100)
+    # classifier.train(num_epochs=100)
     # classifier.sweep()
 
 
     # classifier.load_model("wandb:deepcomputer/Hotdog/Resnet18_finetune_model:v8", model_name="Resnet18_finetune.pth")
     # classifier.test(save_images=10)
+    
+    
+    
+    model = "SimpleCNN"
+    trained_model = "wandb:deepcomputer/grid_search/run_2023-06-07_10-14-16_model:v8"
+    classifier = HotdogClassifier(model = model, use_wandb=False)
+    classifier.load_model(trained_model)
+    classifier.test(save_images=2)
+    # classifier.saliency_map(classifier.test_images["false_positive"][0])
+    classifier.saliency_map("false_positive", img_idx = 0)

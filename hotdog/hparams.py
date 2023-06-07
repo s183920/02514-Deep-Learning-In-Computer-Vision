@@ -12,6 +12,7 @@ wandb_defaults = {
 
 default_config = {
     # "model"	: "SimpleCNN",
+    "seed":0,
 	"optimizer" : "Adam",
 	"loss_fun" : "CrossEntropyLoss",
 	"num_epochs" : 25,
