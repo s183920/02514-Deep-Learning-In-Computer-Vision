@@ -9,12 +9,12 @@ from hparams import wandb_defaults, default_config, sweep_defaults
 import wandb
 from PIL import Image as PILImage
 
-from utils import data_to_img_array, download_model
+from utils import data_to_img_array, download_model, ReduceLROnPlateau
 
 from datetime import datetime as dt
 
 class HotdogClassifier:
-    def __init__(self, name = None, model = None, config = None, use_wandb = True, verbose = True, show_test_images = False, model_save_freq = None, **kwargs):
+    def __init__(self, project = "Hotdog", name = None, model = None, config = None, use_wandb = True, verbose = True, show_test_images = False, model_save_freq = None, **kwargs):
         """
         Class for training and testing a hotdog classifier
 
@@ -74,38 +74,46 @@ class HotdogClassifier:
         self.test_images = []
 
         # set model
-        print(f"Setting model to {model}")
+        # print(f"Setting model to {model}")
         self.set_model("SimpleCNN" if model is None else model)
-        print(f"Model set to {self.model}")
+
 
         # set wandb
         if use_wandb:
-            self.set_logger()
+            self.set_logger(project = project)
 
 
         # set dataset
         self.set_dataset()
         
     
-    def load_model(self, path):
+    def load_model(self, path, model_name = "model.pth"):
+        print(f"Loading model from {path}")
         if path.startswith("wandb:"):
-            dl_path = "logs/Hotdog/models/"
-            path = path[5:]
+            dl_path = "logs/Hotdog/models/latest_from_wandb"
+            path = path[6:]
+            print(f"Downloading model from wandb: {path}")
             path = download_model(path, dl_path)
         
-        self.model.load_state_dict(torch.load(path))           
+        self.model.load_state_dict(torch.load(path+"/"+model_name, map_location=torch.device(self.device)))           
         
     def set_model(self, model):
         print(f"Setting model to {model}")
         
-        if model.lower() == "resnet18":
-            self.model = torchvision.models.resnet18(weights='IMAGENET1K_V1')
-            self.model.name = "resnet18"
+        transfer_learning = model.lower() in ["resnet18"]
+        # if model.lower() == "resnet18":
+        #     self.model = torchvision.models.resnet18(weights='IMAGENET1K_V1')
+        #     self.model.name = "resnet18"
+        # else:
+        model = models.get(model)
+        if model is None:
+            raise ValueError(f"Model not found")
+        
+        if transfer_learning:
+            self.model = model(dropout = self.config["dropout"], batchnorm = self.config["batchnorm"], finetune = self.config["finetune"])
         else:
-            model = models.get(model)
-            if model is None:
-                raise ValueError(f"Model not found")
             self.model = model(dropout = self.config["dropout"], batchnorm = self.config["batchnorm"])
+        
         self.model.to(self.device)
 
 
@@ -118,13 +126,20 @@ class HotdogClassifier:
 
     def set_optimizer(self):
         optimizer = self.config.get("optimizer")
+        
+        # set default lr if not set
+        if optimizer.lower() == "sgd" and "lr" not in self.config["optimizer_kwargs"]:
+            self.config["optimizer_kwargs"]["lr"] = 0.01
+            
+        # set optimizer
         self.optimizer = torch.optim.__dict__.get(optimizer)(self.model.parameters(), **self.config.get("optimizer_kwargs", {}))
         # self.optimizer = torch.optim.__dict__.get(optimizer)(self.model.parameters(), )
         
         
+        
         if self.config.get("use_scheduler", True):
             # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, gamma=0.1, step_size = int(5+0.2*self.config["num_epochs"]))
-            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=0, eps=1e-08, verbose=False)
+            self.scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=3, threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=0, eps=1e-08, verbose=False)
         else:
             self.scheduler = None
 
@@ -158,7 +173,7 @@ class HotdogClassifier:
         self.wandb_run.watch(self.model)
 
 
-    def prepare_train(self, cuda_device):
+    def prepare(self, cuda_device):
         # set seed
         torch.manual_seed(self.config.get("seed", 0))
 
@@ -209,7 +224,7 @@ class HotdogClassifier:
     def train(self, num_epochs=None, cuda_device = [0]):
         # prepare training
         num_epochs = self.config.get("num_epochs") if num_epochs is None else num_epochs
-        self.prepare_train(cuda_device)
+        self.prepare(cuda_device)
         print(f"Starting training on {self.device.type}")
 
         for epoch in tqdm(range(num_epochs), unit='epoch'):
@@ -230,22 +245,25 @@ class HotdogClassifier:
                 print("Accuracy train: {train:.1f}%".format(train=train_acc))
             
             
-            # take step in scheduler
-            if self.scheduler:
-                if self.wandb_run is not None:
-                    self.wandb_run.log({"Learning rate" : self.scheduler.get_last_lr()[0]}, commit = False)
-                self.scheduler.step()
-            
             # test 
             val_acc, val_loss, conf_mat = self.test(validation=True)
+            
+            # take step in scheduler
+            if self.scheduler:
+                self.scheduler.step(val_loss)
+                if self.wandb_run is not None:
+                    self.wandb_run.log({"Learning rate" : self.scheduler.get_last_lr()[0]}, commit = False)
+                
+            
+            
             
             # Save model
             if self.model_save_freq is None:
                 if val_acc > self.best_val_acc:
                     self.best_val_acc = val_acc
-                    self.save_model(f"logs/Hotdog/models/{self.name}.pth", epoch)
+                    self.save_model(f"logs/Hotdog/models/{self.name}/model.pth", epoch)
             elif epoch % self.model_save_freq == 0:
-                self.save_model(f"logs/Hotdog/models/{self.name}.pth", epoch)
+                self.save_model(f"logs/Hotdog/models/{self.name}/model.pth", epoch)
             
             
             # log to wandb
@@ -263,11 +281,19 @@ class HotdogClassifier:
             # clear cache
             self.clear_cache()
             
+        # log best val acc
+        if self.wandb_run is not None:
+            self.wandb_run.log({"Best validation accuracy": self.best_val_acc}, commit = True)
             
-    def test(self, validation = False):       
+            
+    def test(self, validation = False, save_images = 0):  
+        if save_images > 0:
+            self.test_images = {"true_positive" : torch.empty(10, 3, 128, 128), "true_negative" : torch.empty(10, 3, 128, 128), "false_positive" : torch.empty(10, 3, 128, 128), "false_negative" : torch.empty(10, 3, 128, 128)}
+             
         if validation:
             data_loader = self.val_loader
         else:
+            self.prepare([0])
             data_loader = self.test_loader
         data_len = len(data_loader.dataset)
         
@@ -298,6 +324,10 @@ class HotdogClassifier:
             true_negative += tn
             false_positive += fp
             false_negative += fn
+            
+            # save images
+            if save_images > 0:
+                self.save_images(data, target, predicted, output, save_images)
 
         # compute stats
         test_acc = test_correct/len(self.data_test)*100
@@ -308,7 +338,8 @@ class HotdogClassifier:
         # calculate confusion matrix      
         test_acc = test_correct/data_len*100
         test_loss /= len(data_loader)
-        conf_mat = {"true_positive": true_positive/data_len, "true_negative": true_negative/data_len, "false_positive": false_positive/data_len, "false_negative": false_negative/data_len}
+        # conf_mat = {"true_positive": true_positive/data_len, "true_negative": true_negative/data_len, "false_positive": false_positive/data_len, "false_negative": false_negative/data_len}
+        conf_mat = {"true_positive": true_positive, "true_negative": true_negative, "false_positive": false_positive, "false_negative": false_negative}
         
         if self.verbose:
             print("Accuracy test: {test:.1f}%".format(test=test_acc))
@@ -318,14 +349,37 @@ class HotdogClassifier:
 
         return test_acc, test_loss, conf_mat
 
-    def calculate_confusion_matrix(self, target, predicted, idx = False):
+    def save_images(self, data, target, predicted, output, num_images = 5):
+        tp_idx, tn_idx, fp_idx, fn_idx = self.calculate_confusion_matrix(target, predicted, return_idx = True)
+                
+        if len(self.test_images["true_positive"]) <= num_images and sum(tp_idx) > 0:
+            # self.test_images["true_positive"].extend([data[i] for i in tp_idx[:min(num_images, len(tp_idx))]])
+            for i in range(min(num_images, sum(tp_idx))):
+                self.test_images["true_positive"][i] = data[tp_idx][i]
+        
+        if len(self.test_images["true_negative"]) <= num_images and sum(tn_idx) > 0:
+            # self.test_images["true_negative"].extend([data[i] for i in tn_idx[:min(num_images, len(tn_idx))]])
+            for i in range(min(num_images, sum(tn_idx))):
+                self.test_images["true_negative"][i] = data[tn_idx][i]
+        
+        if len(self.test_images["false_positive"]) <= num_images and sum(fp_idx) > 0:
+            for i in range(min(num_images, sum(fp_idx))):
+                self.test_images["false_positive"][i] = data[fp_idx][i]
+        
+        if len(self.test_images["false_negative"]) <= num_images and sum(fn_idx) > 0:
+            # self.test_images["false_negative"].extend([data[i] for i in fn_idx[:min(num_images, len(fn_idx))]])
+            for i in range(min(num_images, sum(fn_idx))):
+                self.test_images["false_negative"][i] = data[fn_idx][i]
+            
+
+    def calculate_confusion_matrix(self, target, predicted, return_idx = False):
         # positve = hotdog (0)
         true_positive = ((target==predicted) & (target==0))
         true_negative = ((target==predicted) & (target==1))
         false_positive = ((target!=predicted) & (target==1))
         false_negative = ((target!=predicted) & (target==0))
         
-        if idx:
+        if return_idx:
            return true_positive, true_negative, false_positive, false_negative
 
 
@@ -388,7 +442,11 @@ class HotdogClassifier:
 
 
 if __name__ == "__main__":
-    classifier = HotdogClassifier(show_test_images=False, model = "Resnet18")
+    classifier = HotdogClassifier(project="HotdogModels", name = "Resnet_finetune", show_test_images=False, model = "Resnet18", use_wandb=True, finetune =True)
     # classifier.dev_mode = True
-    classifier.train(num_epochs=10)
+    classifier.train(num_epochs=100)
     # classifier.sweep()
+
+
+    # classifier.load_model("wandb:deepcomputer/Hotdog/Resnet18_finetune_model:v8", model_name="Resnet18_finetune.pth")
+    # classifier.test(save_images=10)
