@@ -1,5 +1,6 @@
 import torch
 from torch.nn import functional as F
+import torchvision
 from model import models
 from dataloader import HotdogDataset
 from tqdm import tqdm
@@ -7,13 +8,19 @@ import os
 from hparams import wandb_defaults, default_config, sweep_defaults
 import wandb
 from PIL import Image as PILImage
+from torchcam.utils import overlay_mask
+from torchcam.methods import SmoothGradCAMpp, LayerCAM
+from torchvision.transforms.functional import normalize, resize, to_pil_image
+import matplotlib.pyplot as plt
+import numpy as np
 
-from utils import data_to_img_array, download_model
+
+from utils import data_to_img_array, download_model, ReduceLROnPlateau, inverse_normalize
 
 from datetime import datetime as dt
 
 class HotdogClassifier:
-    def __init__(self, name = None, model = None, config = None, use_wandb = True, verbose = True, show_test_images = False, **kwargs):
+    def __init__(self, project = "Hotdog", name = None, model = None, config = None, use_wandb = True, verbose = True, show_test_images = False, model_save_freq = None, **kwargs):
         """
         Class for training and testing a hotdog classifier
 
@@ -29,8 +36,33 @@ class HotdogClassifier:
             Whether to print progress, by default True
         show_test_images : bool, optional
             Whether to show test images, by default False
+        model_save_freq : int, optional
+            How often to save the model, by default None
+            None means only save the best model
         **kwargs : dict
             Additional arguments to config
+            
+        Config
+        ------
+        num_epochs : int
+            Number of epochs to train
+        dropout : float
+            Dropout rate
+        batchnorm : bool
+            Whether to use batchnormalisation
+        train_dataset_kwargs : dict
+            Additional arguments to HotdogDataset for training
+            i.e. train_dataset_kwargs = {"data_augmentation": False}
+        test_dataset_kwargs : dict
+            Additional arguments to HotdogDataset for testing
+        optimizer : str
+            Optimizer to use (from torch.optim)
+        optimizer_kwargs : dict
+            Additional arguments to optimizer
+            e.g. optimizer_kwargs = {"lr": 0.01}
+        scheduler : bool
+            Whether to use a scheduler - will use ExponentialLR with gamma = 0.1
+            Decrease will happen after 20 % of epochs
         """
 
         # set info
@@ -38,6 +70,7 @@ class HotdogClassifier:
         self.verbose = verbose
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.show_test_images = show_test_images
+        self.model_save_freq = model_save_freq
 
         # set init values
         self.config = config if config is not None else default_config
@@ -47,31 +80,46 @@ class HotdogClassifier:
         self.test_images = []
 
         # set model
-        self.set_model("LukasCNN" if model is None else model)
+        # print(f"Setting model to {model}")
+        self.set_model("SimpleCNN" if model is None else model)
+
 
         # set wandb
         if use_wandb:
-            self.set_logger()
+            self.set_logger(project = project)
 
 
         # set dataset
         self.set_dataset()
         
     
-    def load_model(self, path):
+    def load_model(self, path, model_name = "model.pth"):
+        print(f"Loading model from {path}")
         if path.startswith("wandb:"):
-            dl_path = "logs/Hotdog/models/"
-            path = path[5:]
+            dl_path = "logs/Hotdog/models/latest_from_wandb"
+            path = path[6:]
+            print(f"Downloading model from wandb: {path}")
             path = download_model(path, dl_path)
         
-        self.model.load_state_dict(torch.load(path))           
+        self.model.load_state_dict(torch.load(path+"/"+model_name, map_location=torch.device(self.device)))           
         
     def set_model(self, model):
         print(f"Setting model to {model}")
-        model = models.get(model) 
+        
+        transfer_learning = model.lower() in ["resnet18"]
+        # if model.lower() == "resnet18":
+        #     self.model = torchvision.models.resnet18(weights='IMAGENET1K_V1')
+        #     self.model.name = "resnet18"
+        # else:
+        model = models.get(model)
         if model is None:
             raise ValueError(f"Model not found")
-        self.model = model(dropout = self.config["dropout"], batchnorm = self.config["batchnorm"])
+        
+        if transfer_learning:
+            self.model = model(dropout = self.config["dropout"], batchnorm = self.config["batchnorm"], finetune = self.config["finetune"])
+        else:
+            self.model = model(dropout = self.config["dropout"], batchnorm = self.config["batchnorm"])
+        
         self.model.to(self.device)
 
 
@@ -84,8 +132,22 @@ class HotdogClassifier:
 
     def set_optimizer(self):
         optimizer = self.config.get("optimizer")
+        
+        # set default lr if not set
+        if optimizer.lower() == "sgd" and "lr" not in self.config["optimizer_kwargs"]:
+            self.config["optimizer_kwargs"]["lr"] = 0.01
+            
+        # set optimizer
         self.optimizer = torch.optim.__dict__.get(optimizer)(self.model.parameters(), **self.config.get("optimizer_kwargs", {}))
         # self.optimizer = torch.optim.__dict__.get(optimizer)(self.model.parameters(), )
+        
+        
+        
+        if self.config.get("use_scheduler", True):
+            # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, gamma=0.1, step_size = int(5+0.2*self.config["num_epochs"]))
+            self.scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=3, threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=0, eps=1e-08, verbose=False)
+        else:
+            self.scheduler = None
 
     def save_model(self, path, epoch):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -117,9 +179,10 @@ class HotdogClassifier:
         self.wandb_run.watch(self.model)
 
 
-    def prepare_train(self, cuda_device):
+    def prepare(self, cuda_device):
         # set seed
-        torch.manual_seed(self.config.get("seed", 0))
+        if self.config.get("seed") is not None:
+            torch.manual_seed(self.config.get("seed", 0))
 
         # set visible cuda devices
         if self.device.type == "cuda":
@@ -134,6 +197,9 @@ class HotdogClassifier:
 
         # set optimizer
         self.set_optimizer()
+        
+        # set best acc
+        self.best_val_acc = 0
 
 
     def train_step(self, data, target):
@@ -165,7 +231,7 @@ class HotdogClassifier:
     def train(self, num_epochs=None, cuda_device = [0]):
         # prepare training
         num_epochs = self.config.get("num_epochs") if num_epochs is None else num_epochs
-        self.prepare_train(cuda_device)
+        self.prepare(cuda_device)
         print(f"Starting training on {self.device.type}")
 
         for epoch in tqdm(range(num_epochs), unit='epoch'):
@@ -184,13 +250,27 @@ class HotdogClassifier:
             train_acc = train_correct/len(self.data_train)*100
             if self.verbose:
                 print("Accuracy train: {train:.1f}%".format(train=train_acc))
-
-
-            # # Save model
-            self.save_model(f"logs/Hotdog/models/{self.name}.pth", epoch)
+            
             
             # test 
             val_acc, val_loss, conf_mat = self.test(validation=True)
+            
+            # take step in scheduler
+            if self.scheduler:
+                self.scheduler.step(val_loss)
+                if self.wandb_run is not None:
+                    self.wandb_run.log({"Learning rate" : self.scheduler.get_last_lr()[0]}, commit = False)
+                
+            
+            
+            
+            # Save model
+            if self.model_save_freq is None:
+                if val_acc > self.best_val_acc:
+                    self.best_val_acc = val_acc
+                    self.save_model(f"logs/Hotdog/models/{self.name}/model.pth", epoch)
+            elif epoch % self.model_save_freq == 0:
+                self.save_model(f"logs/Hotdog/models/{self.name}/model.pth", epoch)
             
             
             # log to wandb
@@ -206,13 +286,21 @@ class HotdogClassifier:
                 })
             
             # clear cache
-            # self.clear_cache()
+            self.clear_cache()
+            
+        # log best val acc
+        if self.wandb_run is not None:
+            self.wandb_run.log({"Best validation accuracy": self.best_val_acc}, commit = True)
             
             
-    def test(self, validation = False):       
+    def test(self, validation = False, save_images = 0):  
+        if save_images > 0:
+            self.test_images = {"true_positive" : torch.empty(10, 3, 128, 128), "true_negative" : torch.empty(10, 3, 128, 128), "false_positive" : torch.empty(10, 3, 128, 128), "false_negative" : torch.empty(10, 3, 128, 128)}
+             
         if validation:
             data_loader = self.val_loader
         else:
+            self.prepare([0])
             data_loader = self.test_loader
         data_len = len(data_loader.dataset)
         
@@ -243,6 +331,10 @@ class HotdogClassifier:
             true_negative += tn
             false_positive += fp
             false_negative += fn
+            
+            # save images
+            if save_images > 0:
+                self.save_images(data, target, predicted, output, save_images)
 
         # compute stats
         test_acc = test_correct/len(self.data_test)*100
@@ -253,7 +345,8 @@ class HotdogClassifier:
         # calculate confusion matrix      
         test_acc = test_correct/data_len*100
         test_loss /= len(data_loader)
-        conf_mat = {"true_positive": true_positive/data_len, "true_negative": true_negative/data_len, "false_positive": false_positive/data_len, "false_negative": false_negative/data_len}
+        # conf_mat = {"true_positive": true_positive/data_len, "true_negative": true_negative/data_len, "false_positive": false_positive/data_len, "false_negative": false_negative/data_len}
+        conf_mat = {"true_positive": true_positive, "true_negative": true_negative, "false_positive": false_positive, "false_negative": false_negative}
         
         if self.verbose:
             print("Accuracy test: {test:.1f}%".format(test=test_acc))
@@ -263,14 +356,37 @@ class HotdogClassifier:
 
         return test_acc, test_loss, conf_mat
 
-    def calculate_confusion_matrix(self, target, predicted, idx = False):
+    def save_images(self, data, target, predicted, output, num_images = 5):
+        tp_idx, tn_idx, fp_idx, fn_idx = self.calculate_confusion_matrix(target, predicted, return_idx = True)
+                
+        if len(self.test_images["true_positive"]) <= num_images and sum(tp_idx) > 0:
+            # self.test_images["true_positive"].extend([data[i] for i in tp_idx[:min(num_images, len(tp_idx))]])
+            for i in range(min(num_images, sum(tp_idx))):
+                self.test_images["true_positive"][i] = data[tp_idx][i]
+        
+        if len(self.test_images["true_negative"]) <= num_images and sum(tn_idx) > 0:
+            # self.test_images["true_negative"].extend([data[i] for i in tn_idx[:min(num_images, len(tn_idx))]])
+            for i in range(min(num_images, sum(tn_idx))):
+                self.test_images["true_negative"][i] = data[tn_idx][i]
+        
+        if len(self.test_images["false_positive"]) <= num_images and sum(fp_idx) > 0:
+            for i in range(min(num_images, sum(fp_idx))):
+                self.test_images["false_positive"][i] = data[fp_idx][i]
+        
+        if len(self.test_images["false_negative"]) <= num_images and sum(fn_idx) > 0:
+            # self.test_images["false_negative"].extend([data[i] for i in fn_idx[:min(num_images, len(fn_idx))]])
+            for i in range(min(num_images, sum(fn_idx))):
+                self.test_images["false_negative"][i] = data[fn_idx][i]
+            
+
+    def calculate_confusion_matrix(self, target, predicted, return_idx = False):
         # positve = hotdog (0)
         true_positive = ((target==predicted) & (target==0))
         true_negative = ((target==predicted) & (target==1))
         false_positive = ((target!=predicted) & (target==1))
         false_negative = ((target!=predicted) & (target==0))
         
-        if idx:
+        if return_idx:
            return true_positive, true_negative, false_positive, false_negative
 
 
@@ -330,10 +446,52 @@ class HotdogClassifier:
 
     def clear_cache(self):
         os.system("rm -rf ~/.cache/wandb")
+        
+    def saliency_map(self, classification_result, img_idx = 0, ax = None, layer = "convolutional"):
+        assert classification_result in ["true_positive", "true_negative", "false_positive", "false_negative"]
+        
+        data = inverse_normalize(self.test_images[classification_result])
+        
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            
+        # Set your CAM extractor
+        cam_extractor = SmoothGradCAMpp(self.model, target_layer=layer) # layer 4 is the last conv layer of the model
+        # cam_extractor = SmoothGradCAMpp(self.model, target_layer='fc')
+        # get your input
+        input_tensor = data[img_idx].unsqueeze(0).to(self.device)
+
+        out = self.model(input_tensor)
+        # Retrieve the CAM by passing the class index and the model output
+        cams = cam_extractor(out.squeeze(0).argmax().item(), out)
+        
+        # img = images[0]
+        # img = tp_imgs[0]
+        img = data_to_img_array(data)[img_idx]
+        for name, cam in zip(cam_extractor.target_names, cams):
+            # result = overlay_mask(to_pil_image(img, mode = "RGB"), to_pil_image(cam.squeeze(0), mode='F'), alpha=0.5)
+            result = overlay_mask(PILImage.fromarray(img.astype(np.uint8)), to_pil_image(cam.squeeze(0), mode='F'), alpha=0.6)
+            ax.imshow(result); ax.set_axis_off(); 
+            # ax.set_title(name)
+        cam_extractor.remove_hooks()
 
 
 if __name__ == "__main__":
-    classifier = HotdogClassifier(show_test_images=False, model = "ResNet")
+    # classifier = HotdogClassifier(project="HotdogModels", name = "Resnet_feature_extractor", show_test_images=False, model = "Resnet18", use_wandb=True, finetune =False)
     # classifier.dev_mode = True
-    classifier.train(num_epochs=10)
+    # classifier.train(num_epochs=100)
     # classifier.sweep()
+
+
+    # classifier.load_model("wandb:deepcomputer/Hotdog/Resnet18_finetune_model:v8", model_name="Resnet18_finetune.pth")
+    # classifier.test(save_images=10)
+    
+    
+    
+    model = "SimpleCNN"
+    trained_model = "wandb:deepcomputer/grid_search/run_2023-06-07_10-14-16_model:v8"
+    classifier = HotdogClassifier(model = model, use_wandb=False)
+    classifier.load_model(trained_model)
+    classifier.test(save_images=2)
+    # classifier.saliency_map(classifier.test_images["false_positive"][0])
+    classifier.saliency_map("false_positive", img_idx = 0)

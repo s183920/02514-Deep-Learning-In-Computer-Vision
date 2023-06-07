@@ -57,9 +57,8 @@ class HotdogDataset(datasets.ImageFolder):
                 transforms.Resize(self.img_size),
                 #transforms.RandomRotation(random.randint(0,35)),
                 #transforms.ColorJitter(brightness=.5, hue=.3),
-                # transforms.RandomPerspective(distortion_scale=0.6, p = 0.4),
                 transforms.RandomHorizontalFlip(p=0.3),
-                #transforms.RandomEqualize(),
+                transforms.RandomVerticalFlip(p=0.3),
                 transforms.ToTensor(),
                 # transforms.Normalize(mean=[self.mean[0], self.mean[1], self.mean[2]],
                 #                         std=[self.std[0], self.std[1], self.std[2]])
