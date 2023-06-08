@@ -236,17 +236,20 @@ class HotdogClassifier:
 
         for epoch in tqdm(range(num_epochs), unit='epoch'):
             train_correct = 0
+            train_loss = 0
             self.model.train()
             pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
             for minibatch_no, (data, target) in pbar:
-                train_correct_, train_loss = self.train_step(data, target)
+                train_correct_, train_loss_ = self.train_step(data, target)
                 train_correct += train_correct_
+                train_loss += train_loss_.item()
 
                 # break if dev mode
                 if self.dev_mode:
                     break
 
             #Comput the train accuracy
+            train_loss /= len(self.train_loader)
             train_acc = train_correct/len(self.data_train)*100
             if self.verbose:
                 print("Accuracy train: {train:.1f}%".format(train=train_acc))
@@ -342,8 +345,8 @@ class HotdogClassifier:
                 self.save_images(data, target, predicted, output, save_images)
 
         # compute stats
-        test_acc = test_correct/len(self.data_test)*100
-        test_loss /= len(self.test_loader)
+        test_acc = test_correct/data_len*100
+        test_loss /= len(data_loader)
 
         
         
