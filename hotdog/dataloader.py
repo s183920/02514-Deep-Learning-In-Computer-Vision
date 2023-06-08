@@ -31,22 +31,6 @@ class HotdogDataset(datasets.ImageFolder):
             self.train_subset, self.val_subset = torch.utils.data.random_split(
         self, [0.8, 0.2], generator=torch.Generator().manual_seed(1))
 
-    # def mean_std(self):
-    #     data = train_loader.train_subset.dataset
-
-    #     mean = np.zeros(3)
-    #     std = np.zeros(3)
-
-    #     for i in range(len(data)):
-    #         mean += np.array(data[i][0]).mean(axis=(1,2))
-    #         std += np.array(data[i][0]).std(axis=(1,2))
-
-    #     mean /= len(data)
-
-    #     std /= len(data)
-
-    #     print(mean, std)
-
 
 
     @property

@@ -23,6 +23,7 @@ parser.add_argument("-mode", default = "train", choices = ["train", "test"], hel
 
 # classifier args
 parser.add_argument("--name", default = None, type = str, help = "Name of the model")
+parser.add_argument("--project", default = "Hotdog", type = str, help = "Name of the project")
 parser.add_argument('--show-test-images', action='store_true', default=False)
 parser.add_argument("--model", type = str, default = None, help = "Model to use for classification")
 parser.add_argument("--use_wandb", action='store_true', default=True)
@@ -33,6 +34,7 @@ parser.add_argument("--loss_fun", type = str, action=AddToDict, dest = "config",
 parser.add_argument("--num_epochs", type = int, action=AddToDict, dest = "config", help = "Batch size")
 parser.add_argument("--dropout", type = float, action=AddToDict, dest = "config", help = "Dropout")
 parser.add_argument("--batchnorm", type = bool, action=AddToDict, dest = "config", help = "Batchnorm")
+parser.add_argument("--finetune", type = bool, action=AddToDict, dest = "config", help = "Finetune")
 
 # optimizer kwargs
 parser.add_argument("--lr", type = float, action=AddToDict, dest = "optimizer_kwargs", help = "Learning rate")
