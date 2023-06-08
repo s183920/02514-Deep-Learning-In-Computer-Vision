@@ -1,4 +1,6 @@
 seaborn
 tqdm
+wandb
+torchcam
 # torch 
 # torchvision
