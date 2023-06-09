@@ -10,6 +10,7 @@ import numpy as np
 from hparams import default_config
 import PIL
 import wandb
+from val_metrics import dice_overlap, IoU, accuracy, sensitivity, specificity
 
 
 """
@@ -80,8 +81,15 @@ class Segmentator(Agent):
         loss = self.loss_fn(Y_batch, Y_pred)  # forward-pass
         loss.backward()  # backward-pass
         self.optimizer.step()  # update weights
-        
-        return loss
+
+        Y_pred = torch.nn.Sigmoid()(Y_pred)
+        dice_overlap_score = dice_overlap(Y_pred, Y_batch)
+        IoU_score = IoU(Y_pred, Y_batch)
+        accuracy_score = accuracy(Y_pred, Y_batch)
+        sensitivity_score = sensitivity(Y_pred, Y_batch)
+        specificity_score = specificity(Y_pred, Y_batch)
+
+        return loss, dice_overlap_score, IoU_score, accuracy_score, sensitivity_score, specificity_score
         
     def train(self):
         # extract parameters from config
@@ -91,13 +99,24 @@ class Segmentator(Agent):
             print('* Epoch %d/%d' % (epoch+1, num_epochs))
 
             avg_loss = 0
+            avg_dice_overlap_score = 0
+            avg_IoU_score = 0
+            avg_accuracy_score = 0
+            avg_sensitivity_score = 0
+            avg_specificity_score = 0
+
             self.model.train()  # train mode
             for X_batch, Y_batch in self.train_loader:
-                loss = self.train_step(X_batch, Y_batch)
+                loss, dice_overlap_score, IoU_score, accuracy_score, sensitivity_score, specificity_score = self.train_step(X_batch, Y_batch)
 
                 # calculate metrics to show the user
                 avg_loss += loss / len(self.train_loader)
-                
+                avg_dice_overlap_score += dice_overlap_score / len(self.train_loader)
+                avg_IoU_score += IoU_score / len(self.train_loader)
+                avg_accuracy_score += accuracy_score / len(self.train_loader)
+                avg_sensitivity_score += sensitivity_score / len(self.train_loader)
+                avg_specificity_score += specificity_score / len(self.train_loader)
+
             
             
             if self.wandb_run is not None:
@@ -107,6 +126,11 @@ class Segmentator(Agent):
                     "train_loss": avg_loss,
                     "epoch": epoch,
                     "example": example,
+                    "dice_overlap_score": avg_dice_overlap_score,
+                    "IoU_score": avg_IoU_score,
+                    "accuracy_score": avg_accuracy_score,
+                    "sensitivity_score": avg_sensitivity_score,
+                    "specificity_score": avg_specificity_score
                 })
             else:
                 print(' - loss: %f' % avg_loss)
