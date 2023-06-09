@@ -166,3 +166,4 @@ logs/*
 logs/*
 hotdog/logs/*
 *wandb*
+exercises/ex2/data/*
