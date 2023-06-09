@@ -49,6 +49,8 @@ class Agent(object):
         if self.device.type == "cuda":
             os.environ["CUDA_VISIBLE_DEVICES"] = str(cuda_device).strip("[]").replace(" ", "")
             
+        print(f"Using device: {self.device}")
+        
     def clear_cache(self):
         os.system("rm -rf ~/.cache/wandb")
         
@@ -72,8 +74,9 @@ class Agent(object):
             artifact.add_file(path)
             self.wandb_run.log_artifact(artifact)
         
-    def set_optimiser(self, optimizer):
-        self.optimizer = get_optimiser(optimizer, self.model, **self.config["optimizer_kwargs"])
+    def set_optimiser(self):
+        optimizer = self.config["optimiser"]
+        self.optimizer = get_optimiser(optimizer, self.model, **self.config.get("optimizer_kwargs", {}))
         
     def set_logger(self, **kwargs):
         # overwrite defaults with parsed arguments
