@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from tools import Agent
-from dataloader import datasets
+from dataloader import get_datasets
 from model import models
 from loss_functions import loss_functions
 from torch.utils.data import DataLoader
@@ -37,18 +37,22 @@ class Segmentator(Agent):
         self.set_optimiser()
         self.set_loss()
         
-    def set_dataset(self, dataset = "PhC"):
-        size = 128
-        dataset = datasets.get(dataset)
+    def set_dataset(self):
+        dataset = self.config.get("dataset")
+        print(f"Loading dataset: {dataset}")
+        self.trainset, self.testset, self.valset = get_datasets(dataset)
 
         batch_size = 6
-        self.trainset = dataset(train=True)
         self.train_loader = DataLoader(self.trainset, batch_size=batch_size, shuffle=True, num_workers=3)
-        self.testset = dataset(train=False)
         self.test_loader = DataLoader(self.testset, batch_size=batch_size, shuffle=False, num_workers=3)
         
         print('Loaded %d training images' % len(self.trainset))
         print('Loaded %d test images' % len(self.testset))
+        
+        if self.valset is not None:
+            self.val_loader = DataLoader(self.valset, batch_size=batch_size, shuffle=False, num_workers=3)
+            print('Loaded %d validation images' % len(self.valset))
+        
         
     def set_model(self, model):
         model = models.get(model)

@@ -1,5 +1,5 @@
 default_config = {
-    "dataset": "PhC",
+    "dataset": "Lesion",
     "model": "UNet2Exercise",
     "loss" : "bce",
     "optimiser": "Adam",
