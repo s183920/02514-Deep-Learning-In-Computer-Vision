@@ -4,7 +4,7 @@ from tools import Agent
 from dataloader import get_datasets
 from model import models
 from loss_functions import loss_functions
-from val_metrics import dice_overlap, IoU, accuracy, sensitivity, specificity
+from val_metrics import Scorer
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
@@ -84,13 +84,7 @@ class Segmentator(Agent):
         self.optimizer.step()  # update weights
         
         Y_pred = torch.nn.Sigmoid()(Y_pred)
-        scores = {
-            "dice_overlap": dice_overlap(Y_pred, Y_batch),
-            "IoU": IoU(Y_pred, Y_batch),
-            "accuracy": accuracy(Y_pred, Y_batch),
-            "sensitivity": sensitivity(Y_pred, Y_batch),
-            "specificity": specificity(Y_pred, Y_batch),
-        }
+        scores = Scorer(Y_batch, Y_pred).get_scores()
 
         
         return loss, scores
@@ -112,13 +106,13 @@ class Segmentator(Agent):
 
                 # calculate metrics to show the user
                 avg_loss += loss / len(self.train_loader)
-                avg_scores = {k: v + avg_scores[k] / len(self.train_loader) for k, v in scores.items()}
+                avg_scores = {k: avg_scores[k] + v / len(self.train_loader) for k, v in scores.items()}
                 
             # Save model
             if self.config["model_save_freq"] is None:
                 if avg_scores[validation_metric] > best_score:
                     best_score = avg_scores[validation_metric]
-                    self.save_model(f"logs/{self.project}/models/{self.name}", "model.pth", f"model saved with {validation_metric} {np.round(best_score.cpu().detach().numpy(), 2)} on {self.config['dataset']} data at epoch {epoch}")
+                    self.save_model(f"logs/{self.project}/models/{self.name}", "model.pth", f"model saved with {validation_metric} {best_score.cpu().detach().numpy():.3f} on {self.config['dataset']} data at epoch {epoch}")
             elif epoch % self.config["model_save_freq"] == 0:
                 self.save_model(f"logs/{self.project}/models/{self.name}", "model.pth", f"model saved at epoch {epoch}")
             
