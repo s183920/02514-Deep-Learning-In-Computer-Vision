@@ -37,9 +37,17 @@ import torch.nn as nn
 
 
 class Scorer:
-    def __init__(self, y_true, y_pred, class_dims = 1):
+    def __init__(self, y_true, y_pred, class_dims = 1, return_method = "mean"):
         if class_dims > 1:
             raise NotImplementedError("Not implemented for class_dims > 1, i.e. multiclass")
+        
+        # set attributes
+        if return_method == "mean":
+            self.return_method = torch.mean
+        elif return_method == "sum":
+            self.return_method = torch.sum
+        else:
+            raise NotImplementedError("Not implemented for return_method != 'mean' or 'sum'")
         
         self.y_true = y_true
         self.y_pred_vals = y_pred
@@ -51,19 +59,19 @@ class Scorer:
         self.fn = torch.sum(self.y_true * (1 - self.y_pred), dim=[1, 2, 3])
         self.tn = torch.sum((1 - self.y_true) * (1 - self.y_pred), dim=[1, 2, 3])
     
-    def sensitivity(self):
-        return torch.mean(self.tp / (self.tp + self.fn + 1e-6))
+    def sensitivity(self, return_val = "mean"):
+        return self.return_method(self.tp / (self.tp + self.fn + 1e-6))
     
     def specificity(self):
-        return torch.mean(self.tn / (self.tn + self.fp + 1e-6))
+        return self.return_method(self.tn / (self.tn + self.fp + 1e-6))
     
     def accuracy(self):
-        return torch.mean((self.tp + self.tn) / (self.tp + self.tn + self.fp + self.fn + 1e-6))
+        return self.return_method((self.tp + self.tn) / (self.tp + self.tn + self.fp + self.fn + 1e-6))
     
     def IoU(self):
         intersection = torch.sum(self.y_true * self.y_pred, dim=[1, 2, 3])
         union = torch.sum(self.y_true + self.y_pred, dim=[1, 2, 3]) - intersection
-        return torch.mean((intersection + 1e-6) / (union + 1e-6))
+        return self.return_method((intersection + 1e-6) / (union + 1e-6))
     
     def dice(self):
         iou = self.IoU()

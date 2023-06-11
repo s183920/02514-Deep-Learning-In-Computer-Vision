@@ -84,7 +84,7 @@ class Segmentator(Agent):
         self.optimizer.step()  # update weights
         
         Y_pred = torch.nn.Sigmoid()(Y_pred)
-        scores = Scorer(Y_batch, Y_pred).get_scores()
+        scores = Scorer(Y_batch, Y_pred, return_method="sum").get_scores()
 
         
         return loss, scores
@@ -99,31 +99,37 @@ class Segmentator(Agent):
             print('* Epoch %d/%d' % (epoch+1, num_epochs))
 
             avg_loss = 0
-            avg_scores = {"dice_overlap": 0, "IoU": 0, "accuracy": 0, "sensitivity": 0, "specificity": 0}
+            avg_train_scores = {"dice_overlap": 0, "IoU": 0, "accuracy": 0, "sensitivity": 0, "specificity": 0}
             self.model.train()  # train mode
             for X_batch, Y_batch in self.train_loader:
                 loss, scores = self.train_step(X_batch, Y_batch)
 
                 # calculate metrics to show the user
                 avg_loss += loss / len(self.train_loader)
-                avg_scores = {k: avg_scores[k] + v / len(self.train_loader) for k, v in scores.items()}
+                avg_train_scores = {k: avg_train_scores[k] + v / len(self.trainset) for k, v in scores.items()}
+            
+            # validation
+            val_loss, val_scores = self.test(validation = True)
+            print(f"Validation loss: {val_loss}")
                 
             # Save model
             if self.config["model_save_freq"] is None:
-                if avg_scores[validation_metric] > best_score:
-                    best_score = avg_scores[validation_metric]
-                    self.save_model(f"logs/{self.project}/models/{self.name}", "model.pth", f"model saved with {validation_metric} {best_score.cpu().detach().numpy():.3f} on {self.config['dataset']} data at epoch {epoch}")
+                if val_loss < best_score:
+                    best_score = val_loss
+                    self.save_model(f"logs/{self.project}/models/{self.name}", "model.pth", f"model saved with validation loss {best_score:.3f} on {self.config['dataset']} data at epoch {epoch}")
             elif epoch % self.config["model_save_freq"] == 0:
-                self.save_model(f"logs/{self.project}/models/{self.name}", "model.pth", f"model saved at epoch {epoch}")
+                self.save_model(f"logs/{self.project}/models/{self.name}", "model.pth", f"model saved with validation loss {best_score:.3f} on {self.config['dataset']} data at epoch {epoch}")
             
             if self.wandb_run is not None:
                 imgs = self.test_images(validation = True, for_wandb = True)
                 # examples = [wandb.Image(img, caption=f"Idx {idx}") for idx, img in enumerate(imgs)]
                 self.wandb_run.log({
-                    "train_loss": avg_loss,
-                    "epoch": epoch,
+                    "Loss/train_loss": avg_loss,
+                    "Loss/val_loss": val_loss,
+                    "Epoch": epoch,
                     f"{self.config['dataset']} validation examples": wandb.Image(imgs),
-                    **{"Train scores/" + k: v for k, v in avg_scores.items()},
+                    **{"Train scores/" + k: v for k, v in avg_train_scores.items()},
+                    **{"Validation scores/" + k: v for k, v in val_scores.items()},
                     "WANDB segmentation": self.wandb_test_segmentation(validation=True),
                 })
             else:
@@ -131,6 +137,36 @@ class Segmentator(Agent):
         
         # clear cache
         self.clear_cache()
+        
+    def test(self, validation = False):
+        if validation:
+            data_loader = self.val_loader
+        else:
+            data_loader = self.test_loader
+        
+        loader_len = len(data_loader)    
+        data_len = len(data_loader.dataset)
+        
+        # init counters
+        test_scores = {"dice_overlap": 0, "IoU": 0, "accuracy": 0, "sensitivity": 0, "specificity": 0}
+        test_loss = 0
+        
+        # test model
+        self.model.eval()
+        for X_pred, Y_true in data_loader:
+            X_pred = X_pred.to(self.device)
+            with torch.no_grad():
+                Y_pred = self.model(X_pred).cpu()
+                
+            # update counters
+            test_loss += self.loss_fn(Y_pred.cpu(), Y_true).item()
+            test_scores = {k: test_scores[k] + v for k, v in Scorer(Y_true, Y_pred, return_method="sum").get_scores().items()}
+        
+        # calculate average loss and scores
+        test_loss /= loader_len
+        test_scores = {k: v / data_len for k, v in test_scores.items()}
+        
+        return test_loss, test_scores
 
     def test_images(self, validation = True, for_wandb = False):
         
