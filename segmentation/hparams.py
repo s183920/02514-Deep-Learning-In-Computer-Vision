@@ -3,7 +3,7 @@ default_config = {
     "model": "UNet2Exercise",
     "loss" : "bce",
     "optimiser": "Adam",
-    "train_kwargs": {
-        "num_epochs": 10,
-    },
+    "validation_metric": "IoU",
+    "model_save_freq" : None,
+    "num_epochs": 10,
 }
