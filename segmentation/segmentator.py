@@ -4,12 +4,14 @@ from tools import Agent
 from dataloader import get_datasets
 from model import models
 from loss_functions import loss_functions
+from val_metrics import dice_overlap, IoU, accuracy, sensitivity, specificity
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
 from hparams import default_config
 import PIL
 import wandb
+import io
 
 
 """
@@ -81,81 +83,135 @@ class Segmentator(Agent):
         loss.backward()  # backward-pass
         self.optimizer.step()  # update weights
         
-        return loss
+        Y_pred = torch.nn.Sigmoid()(Y_pred)
+        scores = {
+            "dice_overlap": dice_overlap(Y_pred, Y_batch),
+            "IoU": IoU(Y_pred, Y_batch),
+            "accuracy": accuracy(Y_pred, Y_batch),
+            "sensitivity": sensitivity(Y_pred, Y_batch),
+            "specificity": specificity(Y_pred, Y_batch),
+        }
+
+        
+        return loss, scores
         
     def train(self):
         # extract parameters from config
-        num_epochs = self.config["train_kwargs"]["num_epochs"]
+        num_epochs = self.config["num_epochs"]
+        validation_metric = self.config["validation_metric"]
+        best_score = 0
 
         for epoch in range(num_epochs):
             print('* Epoch %d/%d' % (epoch+1, num_epochs))
 
             avg_loss = 0
+            avg_scores = {"dice_overlap": 0, "IoU": 0, "accuracy": 0, "sensitivity": 0, "specificity": 0}
             self.model.train()  # train mode
             for X_batch, Y_batch in self.train_loader:
-                loss = self.train_step(X_batch, Y_batch)
+                loss, scores = self.train_step(X_batch, Y_batch)
 
                 # calculate metrics to show the user
                 avg_loss += loss / len(self.train_loader)
+                avg_scores = {k: v + avg_scores[k] / len(self.train_loader) for k, v in scores.items()}
                 
-            
+            # Save model
+            if self.config["model_save_freq"] is None:
+                if avg_scores[validation_metric] > best_score:
+                    best_score = avg_scores[validation_metric]
+                    self.save_model(f"logs/{self.project}/models/{self.name}", "model.pth", f"model saved with {validation_metric} {np.round(best_score.cpu().detach().numpy(), 2)} on {self.config['dataset']} data at epoch {epoch}")
+            elif epoch % self.config["model_save_freq"] == 0:
+                self.save_model(f"logs/{self.project}/models/{self.name}", "model.pth", f"model saved at epoch {epoch}")
             
             if self.wandb_run is not None:
-                pil_image = self.test_images(validation = True)
-                example = wandb.Image(pil_image, caption=f"Epoch {epoch}")
+                imgs = self.test_images(validation = True, for_wandb = True)
+                # examples = [wandb.Image(img, caption=f"Idx {idx}") for idx, img in enumerate(imgs)]
                 self.wandb_run.log({
                     "train_loss": avg_loss,
                     "epoch": epoch,
-                    "example": example,
+                    f"{self.config['dataset']} validation examples": wandb.Image(imgs),
+                    **{"Train scores/" + k: v for k, v in avg_scores.items()},
+                    "WANDB segmentation": self.wandb_test_segmentation(validation=True),
                 })
             else:
                 print(' - loss: %f' % avg_loss)
+        
+        # clear cache
+        self.clear_cache()
 
-    def test_images(self, validation = True):
+    def test_images(self, validation = True, for_wandb = False):
+        
         if validation:
             X_test, Y_test = next(iter(self.val_loader))
         else:
             X_test, Y_test = next(iter(self.test_loader))
+            
+        ncols = min(X_test.shape[0], 6)
+        nrows = 3
         
         # show intermediate results
         self.model.eval()  # testing mode
         Y_hat = F.sigmoid(self.model(X_test.to(self.device))).detach().cpu()
         
-        fig, axes = plt.subplots(2, 6, figsize=(20, 5))
-        for k in range(6):
+        
+        
+        fig, axes = plt.subplots(nrows, ncols, figsize=(2+3*ncols, 3*nrows))
+        for k in range(ncols):
+            
+            # show input image
             ax = axes[0, k]
             ax.imshow(np.rollaxis(X_test[k].numpy(), 0, 3), cmap='gray')
             ax.set_title('Real')
             ax.set_axis_off()
 
+            # show mask prediction
             ax = axes[1, k]
             ax.imshow(Y_hat[k, 0], cmap='gray')
             ax.set_title('Output')
             ax.set_axis_off()
-        # plt.suptitle('%d / %d - loss: %f' % (epoch+1, num_epochs, avg_loss))
-        # plt.savefig("test.png")
-        # img = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-        # img = from_canvas(fig)
-        import io
-        img_buf = io.BytesIO()
-        plt.savefig(img_buf, format='png')
-
-        img = PIL.Image.open(img_buf)
             
-        return img
+            # show ground truth mask
+            ax = axes[2, k]
+            ax.imshow(Y_test[k, 0], cmap='gray')
+            ax.set_title('Ground truth')
+            ax.set_axis_off()
+
+        if for_wandb:
+            # save image
+            img_buf = io.BytesIO()
+            plt.savefig(img_buf, format='png')
+            img = PIL.Image.open(img_buf)
+                
+            return img
+        
+    def wandb_test_segmentation(self, validation = True):
+        labels = {i : l for i, l in enumerate(self.trainset.dataset.classes)}
+        
+        if validation:
+            X_test, Y_test = next(iter(self.val_loader))
+        else:
+            X_test, Y_test = next(iter(self.test_loader))
+        self.model.eval()  # testing mode
+        Y_hat = F.sigmoid(self.model(X_test.to(self.device))).detach().cpu()
+
+        # util function for generating interactive image mask from components
+        def wb_mask(bg_img, pred_mask, true_mask):
+            pred_mask = (pred_mask > 0.5).astype(np.uint8)
+            return wandb.Image(bg_img, masks={
+                "prediction" : {"mask_data" : pred_mask, "class_labels" : labels},
+                "ground truth" : {"mask_data" : true_mask, "class_labels" : labels}})
+            
+        examples = [wb_mask(np.rollaxis(X_test[k].numpy(), 0, 3), Y_hat[k, 0].numpy(), Y_test[k, 0].numpy()) for k in range(3)]
+        
+        return examples
             
     def predict(self, data):
         self.model.eval()  # testing mode
         Y_pred = [F.sigmoid(self.model(X_batch.to(self.device))) for X_batch, _ in data]
         return np.array(Y_pred)
-        
-def from_canvas(fig):
-    lst = list(fig.canvas.get_width_height())
-    lst.append(3)
-    return PIL.Image.fromarray(np.fromstring(fig.canvas.tostring_rgb(),dtype=np.uint8).reshape(lst))
+
 
 if __name__ == "__main__":
-    segmentator = Segmentator(use_wandb=True)
+    segmentator = Segmentator(use_wandb=True, dataset = "Lesion", num_epochs = 3)
     segmentator.train()
     
     
