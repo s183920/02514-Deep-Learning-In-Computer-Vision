@@ -57,7 +57,7 @@ class Agent(object):
     def load_model(self, path, model_name = "model.pth"):
         print(f"Loading model from {path}")
         if path.startswith("wandb:"):
-            dl_path = "logs/segmentation/models/latest_from_wandb"
+            dl_path = f"logs/{self.project}/models/latest_from_wandb"
             path = path[6:]
             print(f"Downloading model from wandb: {path}")
             path = download_model(path, dl_path)
@@ -65,8 +65,9 @@ class Agent(object):
         self.model.load_state_dict(torch.load(path+"/"+model_name, map_location=torch.device(self.device)))
         
     def save_model(self, path, model_name = "model.pth", description = None):
+        path = os.path.join(path, model_name)
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        torch.save(self.model.state_dict(), path+"/"+model_name)
+        torch.save(self.model.state_dict(), path)
 
         # add artifacts
         if self.wandb_run is not None:

@@ -29,8 +29,8 @@ def specificity(y_true, y_pred):
     return specificity_score
 
 def accuracy(y_true, y_pred):
-    _, predicted = torch.max(y_pred.data, 1)
-    total_train = y_true.nelement()
-    correct_train = predicted.eq(y_true.data).sum().item()
-    accuracy_score = 100 * correct_train / total_train
+    _, y_true_argmax = torch.max(y_true.float(), dim=1)
+    _, y_pred_argmax = torch.max(y_pred.float(), dim=1)
+    correct_predictions = torch.eq(y_true_argmax, y_pred_argmax).float()
+    accuracy_score = torch.mean(correct_predictions).item()
     return accuracy_score
