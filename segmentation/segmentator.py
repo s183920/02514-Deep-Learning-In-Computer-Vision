@@ -107,8 +107,8 @@ class Segmentator(Agent):
 
             self.model.train()  # train mode
             for X_batch, Y_batch in self.train_loader:
-                loss, dice_overlap_score, IoU_score, accuracy_score, sensitivity_score, specificity_score = self.train_step(X_batch, Y_batch)
-
+                loss, dice_overlap_score, IoU_score, accuracy_score, sensitivity_score, specificity_score = self.train_step(X_batch, Y_batch)  
+                      
                 # calculate metrics to show the user
                 avg_loss += loss / len(self.train_loader)
                 avg_dice_overlap_score += dice_overlap_score / len(self.train_loader)
