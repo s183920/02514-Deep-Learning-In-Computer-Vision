@@ -9,8 +9,8 @@ import torch
 from torch.utils.data import  random_split
 import torchvision.transforms as transforms
 
-data_path_drive = '/dtu/datasets1/02514/DRIVE/training'
-data_path_lesion = '/dtu/datasets1/02514/PH2_Dataset_images'
+data_path_drive = '/mnt/c/Users/frede/Downloads/DRIVE/training'
+data_path_lesion = '/mnt/c/Users/frede/Downloads/PH2_Dataset_images/'
 
 class Lesion_Data(torch.utils.data.Dataset):
     def __init__(self, train_transform_size=128, test_transform_size=128, data_path=data_path_lesion):
