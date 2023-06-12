@@ -112,6 +112,10 @@ class Baseline(nn.Module):
         d2 = F.relu(self.bn(self.dec_conv2(self.upsample2(d1))))
         d3 = self.dec_conv3(self.upsample3(d2))  # no activation
         return torch.sigmoid(d3)
+    
+    @property  
+    def name(self):
+        return "Baseline"
 
 models = {
     "UNet" : UNet,
