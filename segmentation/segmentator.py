@@ -92,7 +92,7 @@ class Segmentator(Agent):
     def train(self):
         # extract parameters from config
         num_epochs = self.config["num_epochs"]
-        validation_metric = self.config["validation_metric"]
+        # validation_metric = self.config["validation_metric"]
         best_score = 0
 
         for epoch in range(num_epochs):
