@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from tools import Agent
+from tools import Agent, inverse_normalize
 from dataloader import get_datasets
 from model import models
 from loss_functions import loss_functions
@@ -11,8 +11,7 @@ import numpy as np
 from hparams import default_config
 import PIL
 import wandb
-import io
-
+import io, os
 
 """
 Config:
@@ -146,7 +145,7 @@ class Segmentator(Agent):
                     "WANDB segmentation": self.wandb_test_segmentation(validation=True),
                 })
             else:
-                print(' - loss: %f' % avg_loss)
+                self.test_images(validation = True, for_wandb = False)
         
         # clear cache
         self.clear_cache()
@@ -156,8 +155,7 @@ class Segmentator(Agent):
             data_loader = self.val_loader
         else:
             data_loader = self.test_loader
-        
-        loader_len = len(data_loader)    
+ 
         data_len = len(data_loader.dataset)
         
         # init counters
@@ -172,11 +170,10 @@ class Segmentator(Agent):
                 Y_pred = self.model(X_pred).cpu()
                 
             # update counters
-            test_loss += self.loss_fn(Y_pred, Y_true).item()
+            test_loss += self.loss_fn(Y_pred, Y_true) / len(data_loader)   
             test_scores = {k: test_scores[k] + v for k, v in Scorer(Y_true, Y_pred, return_method="sum", class_threshold=self.class_threshold).get_scores().items()}
         
         # calculate average loss and scores
-        test_loss /= loader_len
         test_scores = {k: v / data_len for k, v in test_scores.items()}
         
         return test_loss, test_scores
@@ -193,9 +190,10 @@ class Segmentator(Agent):
         
         # show intermediate results
         self.model.eval()  # testing mode
-        Y_hat = F.sigmoid(self.model(X_test.to(self.device))).detach().cpu()
+        Y_hat = self.model(X_test.to(self.device)).detach().cpu()
         
-        
+        # unnormalize images
+        X_test = inverse_normalize(X_test, self.config["dataset"])
         
         fig, axes = plt.subplots(nrows, ncols, figsize=(2+3*ncols, 3*nrows))
         for k in range(ncols):
@@ -217,6 +215,10 @@ class Segmentator(Agent):
             ax.imshow(Y_test[k, 0], cmap='gray')
             ax.set_title('Ground truth')
             ax.set_axis_off()
+            
+        if self.wandb_run is None:
+            os.makedirs(f"logs/{self.project}/images/{self.name}", exist_ok=True)
+            plt.savefig(f"logs/{self.project}/images/{self.name}/test_images.png")
 
         if for_wandb:
             # save image
@@ -234,8 +236,12 @@ class Segmentator(Agent):
         else:
             X_test, Y_test = next(iter(self.test_loader))
         self.model.eval()  # testing mode
-        Y_hat = F.sigmoid(self.model(X_test.to(self.device))).detach().cpu()
+        Y_hat = self.model(X_test.to(self.device)).detach().cpu()
 
+        
+        # unnormalize images
+        X_test = inverse_normalize(X_test, self.config["dataset"])
+        
         # util function for generating interactive image mask from components
         def wb_mask(bg_img, pred_mask, true_mask):
             pred_mask = (pred_mask > self.class_threshold).astype(np.uint8)
@@ -254,7 +260,7 @@ class Segmentator(Agent):
 
 
 if __name__ == "__main__":
-    segmentator = Segmentator(use_wandb=True, dataset = "DRIVE", num_epochs = 50, model = "Baseline", data_augmentation = False, class_threshold = 0.6)
+    segmentator = Segmentator(name = "Baseline", data_augmentation = True, use_wandb=True, dataset = "DRIVE", num_epochs = 50, model = "Baseline", loss = "dice_sensitivity")
     segmentator.train()
     
     

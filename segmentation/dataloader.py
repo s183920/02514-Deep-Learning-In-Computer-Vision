@@ -47,30 +47,35 @@ class PhC(torch.utils.data.Dataset):
 class Lesion_Data(torch.utils.data.Dataset):
     data_path = '/dtu/datasets1/02514/PH2_Dataset_images'
     classes = ['Background', 'Lesion']
+    mean = torch.tensor([0.75376641, 0.57684034, 0.48878668])
+    std = torch.tensor([0.15750518, 0.15277521, 0.15188558])
 
     def __init__(self, train_transform_size=128, test_transform_size=128, data_augmentation = False):
         'Initialization'
         self.image_paths = sorted(glob.glob(self.data_path + '/***/**_Dermoscopic_Image/*.bmp'))
         self.mask_paths = sorted(glob.glob(self.data_path + '/***/**_lesion/*.bmp'))
 
+        self.normalization = transforms.Normalize(self.mean, self.std)
         if data_augmentation:
             self.train_transform = transforms.Compose([
-                transforms.Resize((train_transform_size, train_transform_size)),
+                # transforms.Resize((train_transform_size, train_transform_size)),
+                transforms.RandomCrop(train_transform_size),
                 transforms.RandomRotation(random.randint(0,35)),
                 transforms.RandomHorizontalFlip(p=0.3),
-                transforms.ToTensor()
-            ])
-            self.test_transform = transforms.Compose([
-                transforms.Resize((test_transform_size, test_transform_size)),
-                transforms.RandomRotation(random.randint(0,35)),
-                transforms.RandomHorizontalFlip(p=0.3),
-                transforms.ToTensor()
+                transforms.ToTensor(),
+                # transforms.Normalize(self.mean, self.std),
             ])
         else:
-            self.train_transform = transforms.Compose([transforms.Resize((train_transform_size, train_transform_size)),
-                                                            transforms.ToTensor()])
-            self.test_transform = transforms.Compose([transforms.Resize((test_transform_size, test_transform_size)),
-                                                            transforms.ToTensor()])
+            self.train_transform = transforms.Compose([
+                transforms.Resize((train_transform_size, train_transform_size)),
+                transforms.ToTensor(),
+                # transforms.Normalize(self.mean, self.std),
+            ])
+        self.test_transform = transforms.Compose([
+            transforms.Resize((test_transform_size, test_transform_size)),
+            transforms.ToTensor(),
+            # transforms.Normalize(self.mean, self.std),
+        ])
 
     def __len__(self):
         'Returns the total number of samples'
@@ -83,7 +88,7 @@ class Lesion_Data(torch.utils.data.Dataset):
         image = Image.open(image_path)
         mask = Image.open(mask_path)
         Y = self.transform(mask)
-        X = self.transform(image)
+        X = self.normalization(self.transform(image))
         return X, Y
 
 
@@ -121,12 +126,15 @@ class Lesion_Data(torch.utils.data.Dataset):
 class DRIVE_data(torch.utils.data.Dataset):
     data_path = "/dtu/datasets1/02514/DRIVE/training"
     classes = ['Background', 'Vessel']
+    mean = torch.tensor([0.49740665, 0.27065086, 0.16243291])
+    std = torch.tensor([0.32961248, 0.17564391, 0.09661924])
+
     def __init__(self, train_transform_size=128, test_transform_size=128, data_augmentation = False):
         'Initialization'
         self.image_paths = sorted(glob.glob(self.data_path + '/images/*.tif'))
         self.mask_paths = sorted(glob.glob(self.data_path + '/1st_manual/*.gif'))
 
-
+        self.normalization = transforms.Normalize(self.mean, self.std)
 
         if data_augmentation:
             self.train_transform = transforms.Compose([
@@ -135,17 +143,11 @@ class DRIVE_data(torch.utils.data.Dataset):
                 transforms.RandomHorizontalFlip(p=0.3),
                 transforms.ToTensor()
             ])
-            self.test_transform = transforms.Compose([
-                transforms.Resize((test_transform_size, test_transform_size)),
-                transforms.RandomRotation(random.randint(0,35)),
-                transforms.RandomHorizontalFlip(p=0.3),
-                transforms.ToTensor()
-            ])
         else:
             self.train_transform = transforms.Compose([transforms.Resize((train_transform_size, train_transform_size)),
                                                             transforms.ToTensor()])
-            self.test_transform = transforms.Compose([transforms.Resize((test_transform_size, test_transform_size)),
-                                                            transforms.ToTensor()])
+        self.test_transform = transforms.Compose([transforms.Resize((test_transform_size, test_transform_size)),
+                                                        transforms.ToTensor()])
 
     def __len__(self):
         'Returns the total number of samples'
@@ -158,7 +160,7 @@ class DRIVE_data(torch.utils.data.Dataset):
         image = Image.open(image_path)
         mask = Image.open(mask_path)
         Y = self.transform(mask)
-        X = self.transform(image)
+        X = self.normalization(self.transform(image))
         return X, Y
 
     def get_datasets(self):
