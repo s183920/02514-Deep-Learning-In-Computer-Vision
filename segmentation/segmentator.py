@@ -41,10 +41,18 @@ class Segmentator(Agent):
         self.set_optimiser()
         self.set_loss()
         
+        # class threshold
+        self.class_threshold = self.config.get("class_threshold", 0.5)
+        
     def set_dataset(self):
         dataset = self.config.get("dataset")
         print(f"Loading dataset: {dataset}")
-        self.trainset, self.testset, self.valset = get_datasets(dataset)
+        
+        dataset_kwargs = self.config.get("data_set_kwargs", {})
+        if "data_augmentation" in self.config:
+            dataset_kwargs["data_augmentation"] = self.config["data_augmentation"]
+            
+        self.trainset, self.testset, self.valset = get_datasets(dataset, **dataset_kwargs)
 
         batch_size = 6
         self.train_loader = DataLoader(self.trainset, batch_size=batch_size, shuffle=True, num_workers=3)
@@ -63,7 +71,11 @@ class Segmentator(Agent):
         if model is None:
             raise ValueError(f"Model not found")
         
-        self.model = model(**self.config.get("model_kwargs", {}))
+        model_kwargs = self.config.get("model_kwargs", {})
+        if "sizes" in self.config:
+            model_kwargs["sizes"] = self.config["sizes"]
+        
+        self.model = model(**model_kwargs)
         self.model.to(self.device)
         
     def set_loss(self):
@@ -84,7 +96,7 @@ class Segmentator(Agent):
         self.optimizer.step()  # update weights
         
         Y_pred = torch.nn.Sigmoid()(Y_pred)
-        scores = Scorer(Y_batch, Y_pred, return_method="sum").get_scores()
+        scores = Scorer(Y_batch, Y_pred, return_method="sum", class_threshold=self.class_threshold).get_scores()
 
         
         return loss, scores
@@ -92,7 +104,7 @@ class Segmentator(Agent):
     def train(self):
         # extract parameters from config
         num_epochs = self.config["num_epochs"]
-        validation_metric = self.config["validation_metric"]
+        # validation_metric = self.config["validation_metric"]
         best_score = 0
 
         for epoch in range(num_epochs):
@@ -110,6 +122,7 @@ class Segmentator(Agent):
             
             # validation
             val_loss, val_scores = self.test(validation = True)
+            print(f"Train loss: ", avg_loss.item())
             print(f"Validation loss: {val_loss}")
                 
             # Save model
@@ -159,8 +172,8 @@ class Segmentator(Agent):
                 Y_pred = self.model(X_pred).cpu()
                 
             # update counters
-            test_loss += self.loss_fn(Y_pred.cpu(), Y_true).item()
-            test_scores = {k: test_scores[k] + v for k, v in Scorer(Y_true, Y_pred, return_method="sum").get_scores().items()}
+            test_loss += self.loss_fn(Y_pred, Y_true).item()
+            test_scores = {k: test_scores[k] + v for k, v in Scorer(Y_true, Y_pred, return_method="sum", class_threshold=self.class_threshold).get_scores().items()}
         
         # calculate average loss and scores
         test_loss /= loader_len
@@ -225,7 +238,7 @@ class Segmentator(Agent):
 
         # util function for generating interactive image mask from components
         def wb_mask(bg_img, pred_mask, true_mask):
-            pred_mask = (pred_mask > 0.5).astype(np.uint8)
+            pred_mask = (pred_mask > self.class_threshold).astype(np.uint8)
             return wandb.Image(bg_img, masks={
                 "prediction" : {"mask_data" : pred_mask, "class_labels" : labels},
                 "ground truth" : {"mask_data" : true_mask, "class_labels" : labels}})
@@ -241,7 +254,7 @@ class Segmentator(Agent):
 
 
 if __name__ == "__main__":
-    segmentator = Segmentator(use_wandb=True, dataset = "Lesion", num_epochs = 3)
+    segmentator = Segmentator(use_wandb=True, dataset = "DRIVE", num_epochs = 50, model = "Baseline", data_augmentation = False, class_threshold = 0.6)
     segmentator.train()
     
     
