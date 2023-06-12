@@ -109,6 +109,15 @@ class Lesion_Data(torch.utils.data.Dataset):
 
         return train_dataset, test_dataset, val_dataset
 
+    def get_image_paths(self, train_dataset, test_dataset, val_dataset):
+        train_image_paths = [self.image_paths[i] for i in train_dataset.indices]
+        test_image_paths = [self.image_paths[i] for i in test_dataset.indices]
+        val_image_paths = [self.image_paths[i] for i in val_dataset.indices]
+
+        return train_image_paths, test_image_paths, val_image_paths
+
+
+
 class DRIVE_data(torch.utils.data.Dataset):
     data_path = "/dtu/datasets1/02514/DRIVE/training"
     classes = ['Background', 'Vessel']
@@ -171,6 +180,13 @@ class DRIVE_data(torch.utils.data.Dataset):
         val_dataset.dataset.classes = self.classes
 
         return train_dataset, test_dataset, val_dataset
+
+    def get_image_paths(self, train_dataset, test_dataset, val_dataset):
+        train_image_paths = [self.image_paths[i] for i in train_dataset.indices]
+        test_image_paths = [self.image_paths[i] for i in test_dataset.indices]
+        val_image_paths = [self.image_paths[i] for i in val_dataset.indices]
+
+        return train_image_paths, test_image_paths, val_image_paths
 
 def get_datasets(dataset_name, **kwargs):
     if dataset_name == "PhC":
