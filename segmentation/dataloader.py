@@ -79,7 +79,7 @@ class Lesion_Data(torch.utils.data.Dataset):
         train_size = train_size - val_size
         
         # get datasets
-        train_dataset, test_dataset, val_dataset = random_split(self, [train_size, test_size, val_size])
+        train_dataset, test_dataset, val_dataset = random_split(self, [train_size, test_size, val_size], generator=torch.Generator().manual_seed(1))
         
         # set transforms
         train_dataset.dataset.transform = self.train_transform
@@ -128,7 +128,7 @@ class DRIVE_data(torch.utils.data.Dataset):
         test_size = len(self) - train_size
         val_size = int(0.2 * train_size)
         train_size = train_size - val_size
-        train_dataset, test_dataset, val_dataset = random_split(self, [train_size, test_size, val_size])
+        train_dataset, test_dataset, val_dataset = random_split(self, [train_size, test_size, val_size], generator=torch.Generator().manual_seed(1))
         
         # set transforms
         train_dataset.dataset.transform = self.train_transform
