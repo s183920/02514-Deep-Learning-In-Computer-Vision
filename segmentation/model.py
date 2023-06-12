@@ -65,7 +65,70 @@ class UNet2Exercise(nn.Module):
     @property
     def name(self):
         return "UNet2Exercise"
+
+class EncDec4(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        # Encoder
+        self.enc_conv1 = nn.Conv2d(3, 64, 5, padding=2)
+        self.enc_bn1 = nn.BatchNorm2d(64)
+        self.enc_conv2 = nn.Conv2d(64, 128, 5, padding=2)
+        self.enc_bn2 = nn.BatchNorm2d(128)
+        self.enc_conv3 = nn.Conv2d(128, 256, 5, padding=2)
+        self.enc_bn3 = nn.BatchNorm2d(256)
+        self.enc_conv4 = nn.Conv2d(256, 512, 5, padding=2)
+        self.enc_bn4 = nn.BatchNorm2d(512)
+        self.pool = nn.MaxPool2d(2, 2)
+
+        # Bottleneck
+        self.bottleneck_conv = nn.Conv2d(512, 512, 5, padding=2)
+        self.bottleneck_bn = nn.BatchNorm2d(512)
+
+        # Decoder
+        self.upconv1 = nn.ConvTranspose2d(512, 256, 2, stride=2)
+        self.dec_conv1 = nn.Conv2d(512, 256, 5, padding=2)
+        self.dec_bn1 = nn.BatchNorm2d(256)
+        self.upconv2 = nn.ConvTranspose2d(256, 128, 2, stride=2)
+        self.dec_conv2 = nn.Conv2d(256, 128, 5, padding=2)
+        self.dec_bn2 = nn.BatchNorm2d(128)
+        self.upconv3 = nn.ConvTranspose2d(128, 64, 2, stride=2)
+        self.dec_conv3 = nn.Conv2d(128, 64, 5, padding=2)
+        self.dec_bn3 = nn.BatchNorm2d(64)
+        self.dec_conv4 = nn.Conv2d(64, 1, 1)
+
+    def forward(self, x):
+        # Encoder
+        x1 = F.relu(self.enc_bn1(self.enc_conv1(x)))
+        x2 = self.pool(x1)
+        x2 = F.relu(self.enc_bn2(self.enc_conv2(x2)))
+        x3 = self.pool(x2)
+        x3 = F.relu(self.enc_bn3(self.enc_conv3(x3)))
+        x4 = self.pool(x3)
+        x4 = F.relu(self.enc_bn4(self.enc_conv4(x4)))
+
+        # Bottleneck
+        bottleneck = F.relu(self.bottleneck_bn(self.bottleneck_conv(x4)))
+
+        # Decoder
+        x = F.relu(self.upconv1(bottleneck))
+        x = torch.cat((x, x3), dim=1)
+        x = F.relu(self.dec_bn1(self.dec_conv1(x)))
+        x = F.relu(self.upconv2(x))
+        x = torch.cat((x, x2), dim=1)
+        x = F.relu(self.dec_bn2(self.dec_conv2(x)))
+        x = F.relu(self.upconv3(x))
+        x = torch.cat((x, x1), dim=1)
+        x = F.relu(self.dec_bn3(self.dec_conv3(x)))
+        x = self.dec_conv4(x)
+        x = torch.sigmoid(x)
+
+        return x
     
+    @property
+    def name(self):
+        return "EncDec4"
+
 
 class UNet(nn.Module):
     def __init__(self, sizes = [64, 64, 64, 64]):
@@ -131,7 +194,7 @@ class UNet(nn.Module):
     
     @property
     def name(self):
-        return "UNet2Exercise"
+        return "UNet"
     
     
 class SimpleCNN(nn.Module):
@@ -176,4 +239,5 @@ models = {
     "UNet2Exercise": UNet2Exercise,
     "UNet" : UNet,
     "SimpleCNN": SimpleCNN,
+    "EncDec": EncDec4,
 }
