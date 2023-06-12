@@ -44,7 +44,12 @@ class Segmentator(Agent):
     def set_dataset(self):
         dataset = self.config.get("dataset")
         print(f"Loading dataset: {dataset}")
-        self.trainset, self.testset, self.valset = get_datasets(dataset)
+        
+        dataset_kwargs = self.config.get("data_set_kwargs", {})
+        if "data_augmentation" in self.config:
+            dataset_kwargs["data_augmentation"] = self.config["data_augmentation"]
+            
+        self.trainset, self.testset, self.valset = get_datasets(dataset, **dataset_kwargs)
 
         batch_size = 6
         self.train_loader = DataLoader(self.trainset, batch_size=batch_size, shuffle=True, num_workers=3)
@@ -63,7 +68,11 @@ class Segmentator(Agent):
         if model is None:
             raise ValueError(f"Model not found")
         
-        self.model = model(**self.config.get("model_kwargs", {}))
+        model_kwargs = self.config.get("model_kwargs", {})
+        if "sizes" in self.config:
+            model_kwargs["sizes"] = self.config["sizes"]
+        
+        self.model = model(**model_kwargs)
         self.model.to(self.device)
         
     def set_loss(self):
@@ -92,7 +101,7 @@ class Segmentator(Agent):
     def train(self):
         # extract parameters from config
         num_epochs = self.config["num_epochs"]
-        validation_metric = self.config["validation_metric"]
+        # validation_metric = self.config["validation_metric"]
         best_score = 0
 
         for epoch in range(num_epochs):
@@ -110,6 +119,7 @@ class Segmentator(Agent):
             
             # validation
             val_loss, val_scores = self.test(validation = True)
+            print(f"Train loss: ", avg_loss.item())
             print(f"Validation loss: {val_loss}")
                 
             # Save model
@@ -241,7 +251,7 @@ class Segmentator(Agent):
 
 
 if __name__ == "__main__":
-    segmentator = Segmentator(use_wandb=True, dataset = "Lesion", num_epochs = 3)
+    segmentator = Segmentator(use_wandb=True, dataset = "Lesion", num_epochs = 50, model = "UNet", data_augmentation = True, sizes = [64, 128, 256, 512])
     segmentator.train()
     
     
