@@ -118,8 +118,12 @@ class Lesion_Data(torch.utils.data.Dataset):
         train_image_paths = [self.image_paths[i] for i in train_dataset.indices]
         test_image_paths = [self.image_paths[i] for i in test_dataset.indices]
         val_image_paths = [self.image_paths[i] for i in val_dataset.indices]
+        train_mask_paths = [self.mask_paths[i] for i in train_dataset.indices]
+        test_mask_paths = [self.mask_paths[i] for i in test_dataset.indices]
+        val_mask_paths = [self.mask_paths[i] for i in val_dataset.indices]
 
-        return train_image_paths, test_image_paths, val_image_paths
+        return train_image_paths, test_image_paths, val_image_paths, train_mask_paths, test_mask_paths, val_mask_paths
+
 
 
 
@@ -188,7 +192,11 @@ class DRIVE_data(torch.utils.data.Dataset):
         test_image_paths = [self.image_paths[i] for i in test_dataset.indices]
         val_image_paths = [self.image_paths[i] for i in val_dataset.indices]
 
-        return train_image_paths, test_image_paths, val_image_paths
+        train_mask_paths = [self.mask_paths[i] for i in train_dataset.indices]
+        test_mask_paths = [self.mask_paths[i] for i in test_dataset.indices]
+        val_mask_paths = [self.mask_paths[i] for i in val_dataset.indices]
+
+        return train_image_paths, test_image_paths, val_image_paths, train_mask_paths, test_mask_paths, val_mask_paths
 
 def get_datasets(dataset_name, **kwargs):
     if dataset_name == "PhC":
