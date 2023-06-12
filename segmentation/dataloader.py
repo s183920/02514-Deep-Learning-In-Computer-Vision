@@ -8,7 +8,7 @@ import random
 
 class PhC(torch.utils.data.Dataset):
     classes = ['Background', 'Cell']
-    
+
     def __init__(self, train):
         'Initialization'
         self.data_path = '/dtu/datasets1/02514/phc_data'
@@ -17,13 +17,13 @@ class PhC(torch.utils.data.Dataset):
         self.image_paths = sorted(glob.glob(data_path + '/images/*.jpg'))
         self.label_paths = sorted(glob.glob(data_path + '/labels/*.png'))
         self.train = train
-        
+
         size = 128
-        self.train_transform = transforms.Compose([transforms.Resize((size, size)), 
+        self.train_transform = transforms.Compose([transforms.Resize((size, size)),
                                             transforms.ToTensor()])
-        self.test_transform = transforms.Compose([transforms.Resize((size, size)), 
+        self.test_transform = transforms.Compose([transforms.Resize((size, size)),
                                             transforms.ToTensor()])
-        
+
     def __len__(self):
         'Returns the total number of samples'
         return len(self.image_paths)
@@ -32,10 +32,10 @@ class PhC(torch.utils.data.Dataset):
         'Generates one sample of data'
         image_path = self.image_paths[idx]
         label_path = self.label_paths[idx]
-        
+
         image = Image.open(image_path)
         label = Image.open(label_path)
-        
+
         if self.train:
             Y = self.train_transform(label)
             X = self.train_transform(image)
@@ -43,35 +43,35 @@ class PhC(torch.utils.data.Dataset):
             Y = self.test_transform(label)
             X = self.test_transform(image)
         return X, Y
-    
+
 class Lesion_Data(torch.utils.data.Dataset):
     data_path = '/dtu/datasets1/02514/PH2_Dataset_images'
     classes = ['Background', 'Lesion']
-    
+
     def __init__(self, train_transform_size=128, test_transform_size=128, data_augmentation = False):
         'Initialization'
         self.image_paths = sorted(glob.glob(self.data_path + '/***/**_Dermoscopic_Image/*.bmp'))
         self.mask_paths = sorted(glob.glob(self.data_path + '/***/**_lesion/*.bmp'))
-        
+
         if data_augmentation:
             self.train_transform = transforms.Compose([
-                transforms.Resize((train_transform_size, train_transform_size)), 
+                transforms.Resize((train_transform_size, train_transform_size)),
                 transforms.RandomRotation(random.randint(0,35)),
                 transforms.RandomHorizontalFlip(p=0.3),
                 transforms.ToTensor()
             ])
             self.test_transform = transforms.Compose([
-                transforms.Resize((test_transform_size, test_transform_size)), 
+                transforms.Resize((test_transform_size, test_transform_size)),
                 transforms.RandomRotation(random.randint(0,35)),
                 transforms.RandomHorizontalFlip(p=0.3),
                 transforms.ToTensor()
             ])
         else:
-            self.train_transform = transforms.Compose([transforms.Resize((train_transform_size, train_transform_size)), 
+            self.train_transform = transforms.Compose([transforms.Resize((train_transform_size, train_transform_size)),
                                                             transforms.ToTensor()])
-            self.test_transform = transforms.Compose([transforms.Resize((test_transform_size, test_transform_size)), 
+            self.test_transform = transforms.Compose([transforms.Resize((test_transform_size, test_transform_size)),
                                                             transforms.ToTensor()])
-        
+
     def __len__(self):
         'Returns the total number of samples'
         return len(self.image_paths)
@@ -85,30 +85,30 @@ class Lesion_Data(torch.utils.data.Dataset):
         Y = self.transform(mask)
         X = self.transform(image)
         return X, Y
-    
-    
+
+
     def get_datasets(self):
         # Split into train, test, val
         train_size = int(0.8 * len(self))
         test_size = len(self) - train_size
         val_size = int(0.2 * train_size)
         train_size = train_size - val_size
-        
+
         # get datasets
         train_dataset, test_dataset, val_dataset = random_split(self, [train_size, test_size, val_size], generator=torch.Generator().manual_seed(1))
-        
+
         # set transforms
         train_dataset.dataset.transform = self.train_transform
         test_dataset.dataset.transform = self.test_transform
         val_dataset.dataset.transform = self.test_transform
-        
-        # set classes   
+
+        # set classes
         train_dataset.dataset.classes = self.classes
         test_dataset.dataset.classes = self.classes
         val_dataset.dataset.classes = self.classes
-        
+
         return train_dataset, test_dataset, val_dataset
-    
+
 class DRIVE_data(torch.utils.data.Dataset):
     data_path = "/dtu/datasets1/02514/DRIVE/training"
     classes = ['Background', 'Vessel']
@@ -145,19 +145,26 @@ class DRIVE_data(torch.utils.data.Dataset):
         val_size = int(0.2 * train_size)
         train_size = train_size - val_size
         train_dataset, test_dataset, val_dataset = random_split(self, [train_size, test_size, val_size], generator=torch.Generator().manual_seed(1))
-        
+
         # set transforms
         train_dataset.dataset.transform = self.train_transform
         test_dataset.dataset.transform = self.test_transform
         val_dataset.dataset.transform = self.test_transform
-        
-        # set classes   
+
+        # set classes
         train_dataset.dataset.classes = self.classes
         test_dataset.dataset.classes = self.classes
         val_dataset.dataset.classes = self.classes
-        
+
         return train_dataset, test_dataset, val_dataset
-    
+
+    def get_image_paths(self, train_dataset, test_dataset, val_dataset):
+        train_image_paths = [self.image_paths[i] for i in train_dataset.indices]
+        test_image_paths = [self.image_paths[i] for i in test_dataset.indices]
+        val_image_paths = [self.image_paths[i] for i in val_dataset.indices]
+
+        return train_image_paths, test_image_paths, val_image_paths
+
 class DRIVE_data(torch.utils.data.Dataset):
     data_path = '/dtu/datasets1/02514/DRIVE/training'
     def __init__(self, train_transform_size=128, test_transform_size=128, data_path=data_path):
@@ -197,6 +204,13 @@ class DRIVE_data(torch.utils.data.Dataset):
         val_dataset.dataset.transform = self.test_transform
         return train_dataset, test_dataset, val_dataset
 
+    def get_image_paths(self, train_dataset, test_dataset, val_dataset):
+        train_image_paths = [self.image_paths[i] for i in train_dataset.indices]
+        test_image_paths = [self.image_paths[i] for i in test_dataset.indices]
+        val_image_paths = [self.image_paths[i] for i in val_dataset.indices]
+
+        return train_image_paths, test_image_paths, val_image_paths
+
 def get_datasets(dataset_name, **kwargs):
     if dataset_name == "PhC":
         train_dataset = PhC(train=True, **kwargs)
@@ -208,5 +222,5 @@ def get_datasets(dataset_name, **kwargs):
         train_dataset, test_dataset, val_dataset = DRIVE_data(**kwargs).get_datasets()
     else:
         raise ValueError("Dataset {} not found".format(dataset_name))
-    
+
     return train_dataset, test_dataset, val_dataset
