@@ -34,6 +34,9 @@ class Agent(object):
         if use_wandb:
             self.set_logger(**wandb_kwargs)
             
+        # set seed
+        self.set_seed()
+            
     def set_dataset(self):
         raise NotImplementedError("Implement method for storing datasets and loaders for train, validation and test")
     
