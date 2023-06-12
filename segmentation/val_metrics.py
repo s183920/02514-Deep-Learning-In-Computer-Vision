@@ -37,7 +37,7 @@ import torch.nn as nn
 
 
 class Scorer:
-    def __init__(self, y_true, y_pred, class_dims = 1, return_method = "mean"):
+    def __init__(self, y_true, y_pred, class_threshold = 0.5, class_dims = 1, return_method = "mean"):
         if class_dims > 1:
             raise NotImplementedError("Not implemented for class_dims > 1, i.e. multiclass")
         
@@ -51,7 +51,7 @@ class Scorer:
         
         self.y_true = y_true
         self.y_pred_vals = y_pred
-        self.y_pred = (y_pred > 0.5).int()
+        self.y_pred = (y_pred > class_threshold).int()
         
         # get confusion matrix
         self.tp = torch.sum(self.y_true * self.y_pred, dim=[1, 2, 3])
@@ -59,7 +59,7 @@ class Scorer:
         self.fn = torch.sum(self.y_true * (1 - self.y_pred), dim=[1, 2, 3])
         self.tn = torch.sum((1 - self.y_true) * (1 - self.y_pred), dim=[1, 2, 3])
     
-    def sensitivity(self, return_val = "mean"):
+    def sensitivity(self):
         return self.return_method(self.tp / (self.tp + self.fn + 1e-6))
     
     def specificity(self):
