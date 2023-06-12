@@ -241,7 +241,7 @@ class Segmentator(Agent):
 
 
 if __name__ == "__main__":
-    segmentator = Segmentator(use_wandb=True, dataset = "Lesion", num_epochs = 3)
+    segmentator = Segmentator(use_wandb=True, dataset = "Lesion", num_epochs = 10, model = "UNet")
     segmentator.train()
     
     
