@@ -104,7 +104,7 @@ class Segmentator(Agent):
         # extract parameters from config
         num_epochs = self.config["num_epochs"]
         # validation_metric = self.config["validation_metric"]
-        best_score = 0
+        best_score = np.inf
 
         for epoch in range(num_epochs):
             print('* Epoch %d/%d' % (epoch+1, num_epochs))
@@ -123,6 +123,9 @@ class Segmentator(Agent):
             val_loss, val_scores = self.test(validation = True)
             print(f"Train loss: ", avg_loss.item())
             print(f"Validation loss: {val_loss}")
+            
+            # test 
+            test_loss, test_scores = self.test(validation = False)
                 
             # Save model
             if self.config["model_save_freq"] is None:
@@ -142,10 +145,13 @@ class Segmentator(Agent):
                     f"{self.config['dataset']} validation examples": wandb.Image(imgs),
                     **{"Train scores/" + k: v for k, v in avg_train_scores.items()},
                     **{"Validation scores/" + k: v for k, v in val_scores.items()},
+                    **{"Test scores/" + k: v for k, v in test_scores.items()},
                     "WANDB segmentation": self.wandb_test_segmentation(validation=True),
                 })
             else:
                 self.test_images(validation = True, for_wandb = False)
+        
+        self.save_model(f"logs/{self.project}/models/{self.name}", "model.pth", f"model saved with validation loss {best_score:.3f} on {self.config['dataset']} data at epoch {epoch}")
         
         # clear cache
         self.clear_cache()
@@ -260,7 +266,7 @@ class Segmentator(Agent):
 
 
 if __name__ == "__main__":
-    segmentator = Segmentator(name = "Baseline", data_augmentation = True, use_wandb=True, dataset = "DRIVE", num_epochs = 50, model = "Baseline", loss = "dice_sensitivity")
+    segmentator = Segmentator(name = "Baseline_focal_dataaug", data_augmentation = True, use_wandb=True, dataset = "DRIVE", num_epochs = 100, model = "Baseline", loss = "focal")
     segmentator.train()
     
     
