@@ -55,15 +55,16 @@ class Lesion_Data(torch.utils.data.Dataset):
         
         if data_augmentation:
             self.train_transform = transforms.Compose([
-                transforms.Resize((train_transform_size, train_transform_size)), 
+                # transforms.Resize((train_transform_size, train_transform_size)), 
+                transforms.RandomCrop(train_transform_size),
                 transforms.RandomRotation(random.randint(0,35)),
                 transforms.RandomHorizontalFlip(p=0.3),
                 transforms.ToTensor()
             ])
             self.test_transform = transforms.Compose([
                 transforms.Resize((test_transform_size, test_transform_size)), 
-                transforms.RandomRotation(random.randint(0,35)),
-                transforms.RandomHorizontalFlip(p=0.3),
+                # transforms.RandomRotation(random.randint(0,35)),
+                # transforms.RandomHorizontalFlip(p=0.3),
                 transforms.ToTensor()
             ])
         else:

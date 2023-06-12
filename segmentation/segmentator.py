@@ -11,8 +11,7 @@ import numpy as np
 from hparams import default_config
 import PIL
 import wandb
-import io
-
+import io, os
 
 """
 Config:
@@ -146,7 +145,7 @@ class Segmentator(Agent):
                     "WANDB segmentation": self.wandb_test_segmentation(validation=True),
                 })
             else:
-                print(' - loss: %f' % avg_loss)
+                self.test_images(validation = True, for_wandb = False)
         
         # clear cache
         self.clear_cache()
@@ -193,7 +192,7 @@ class Segmentator(Agent):
         
         # show intermediate results
         self.model.eval()  # testing mode
-        Y_hat = F.sigmoid(self.model(X_test.to(self.device))).detach().cpu()
+        Y_hat = self.model(X_test.to(self.device)).detach().cpu()
         
         
         
@@ -217,6 +216,10 @@ class Segmentator(Agent):
             ax.imshow(Y_test[k, 0], cmap='gray')
             ax.set_title('Ground truth')
             ax.set_axis_off()
+            
+        if self.wandb_run is None:
+            os.makedirs(f"logs/{self.project}/images/{self.name}", exist_ok=True)
+            plt.savefig(f"logs/{self.project}/images/{self.name}/test_images.png")
 
         if for_wandb:
             # save image
@@ -234,7 +237,7 @@ class Segmentator(Agent):
         else:
             X_test, Y_test = next(iter(self.test_loader))
         self.model.eval()  # testing mode
-        Y_hat = F.sigmoid(self.model(X_test.to(self.device))).detach().cpu()
+        Y_hat = self.model(X_test.to(self.device)).detach().cpu()
 
         # util function for generating interactive image mask from components
         def wb_mask(bg_img, pred_mask, true_mask):
@@ -254,7 +257,7 @@ class Segmentator(Agent):
 
 
 if __name__ == "__main__":
-    segmentator = Segmentator(use_wandb=True, dataset = "DRIVE", num_epochs = 50, model = "Baseline", data_augmentation = False, class_threshold = 0.6)
+    segmentator = Segmentator(name = "Baseline", data_augmentation = True, use_wandb=False, dataset = "Lesion", num_epochs = 50, model = "Baseline", loss = "bce_tv")
     segmentator.train()
     
     
