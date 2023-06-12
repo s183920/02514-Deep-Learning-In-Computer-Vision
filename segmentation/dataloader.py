@@ -4,6 +4,7 @@ import glob
 import PIL.Image as Image
 from torchvision import transforms
 from torch.utils.data import  random_split
+import random
 
 class PhC(torch.utils.data.Dataset):
     classes = ['Background', 'Cell']
@@ -47,13 +48,28 @@ class Lesion_Data(torch.utils.data.Dataset):
     data_path = '/dtu/datasets1/02514/PH2_Dataset_images'
     classes = ['Background', 'Lesion']
     
-    def __init__(self, train_transform_size=128, test_transform_size=128):
+    def __init__(self, train_transform_size=128, test_transform_size=128, data_augmentation = False):
         'Initialization'
         self.image_paths = sorted(glob.glob(self.data_path + '/***/**_Dermoscopic_Image/*.bmp'))
         self.mask_paths = sorted(glob.glob(self.data_path + '/***/**_lesion/*.bmp'))
-        self.train_transform = transforms.Compose([transforms.Resize((train_transform_size, train_transform_size)), 
+        
+        if data_augmentation:
+            self.train_transform = transforms.Compose([
+                transforms.Resize((train_transform_size, train_transform_size)), 
+                transforms.RandomRotation(random.randint(0,35)),
+                transforms.RandomHorizontalFlip(p=0.3),
+                transforms.ToTensor()
+            ])
+            self.test_transform = transforms.Compose([
+                transforms.Resize((test_transform_size, test_transform_size)), 
+                transforms.RandomRotation(random.randint(0,35)),
+                transforms.RandomHorizontalFlip(p=0.3),
+                transforms.ToTensor()
+            ])
+        else:
+            self.train_transform = transforms.Compose([transforms.Resize((train_transform_size, train_transform_size)), 
                                                             transforms.ToTensor()])
-        self.test_transform = transforms.Compose([transforms.Resize((test_transform_size, test_transform_size)), 
+            self.test_transform = transforms.Compose([transforms.Resize((test_transform_size, test_transform_size)), 
                                                             transforms.ToTensor()])
         
     def __len__(self):
