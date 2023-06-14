@@ -167,3 +167,8 @@ logs/*
 hotdog/logs/*
 *wandb*
 exercises/ex2/data/*
+
+
+
+# gan
+gan/pretrained_models/*
