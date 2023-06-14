@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import PIL
 import shutil
+import imageio
 
 # own modules
 from project import run_projection
@@ -25,7 +26,11 @@ class LatentExplorer:
         self.align = align
         self.folder = f"gan/results/{name}"
         
+        
+        # create folders
         os.makedirs(self.folder, exist_ok=True)
+        os.makedirs(self.folder + "/original", exist_ok=True)
+        os.makedirs(self.folder + "/aligned", exist_ok=True)
         
     def split_path(self, img_path):
         img_folder, img_name = os.path.split(img_path)
@@ -36,8 +41,7 @@ class LatentExplorer:
         img_folder, img_name, img_ext = self.split_path(img_path)
         
         # copy image to folder
-        shutil.copy(img_path, self.folder + "/original/" + img_name + img_ext)
-        img_path = self.folder + "/original/" + img_name + img_ext
+        img_path = shutil.copy(img_path, self.folder + "/original/" + img_name + img_ext)
         
         # align image
         if self.align:
@@ -45,16 +49,25 @@ class LatentExplorer:
             if os.path.exists(save_path):
                 return save_path
             img_path = align_face(img_path, save_path=save_path)
+        
+        return img_path
             
     def reconstruct(self, img_path):
+        # get img names and paths
         img_folder, img_name, img_ext = self.split_path(img_path)
+        img_path = self.get_img_path(img_path)
+        
+        # set output dir
         outdir = self.folder + "/reconstruction/" + img_name
          
         img_path = self.get_img_path(img_path)
         run_projection(img_path, outdir=outdir)
         
     def get_latent(self, img_path, step = None):
+        # get img names and paths
         img_folder, img_name, img_ext = self.split_path(img_path)
+        img_path = self.get_img_path(img_path)
+        
         rep_path = self.folder + "/reconstruction/" + img_name + "/projected_w.npz"
     
         if os.path.exists(rep_path):
@@ -75,7 +88,7 @@ class LatentExplorer:
         return synth_image
         # video.append_data(np.concatenate([target_uint8, synth_image], axis=1))
         
-    def interpolate(self, img_path1, img_path2, weight=0.5):
+    def interpolate(self, img_path1, img_path2, weight=0.5, plot = True, save_video = False):
         # get img names
         img_folder1, img_name1, img_ext1 = self.split_path(img_path1)
         img_folder2, img_name2, img_ext2 = self.split_path(img_path2)
@@ -95,34 +108,98 @@ class LatentExplorer:
         img = self.synthesize(z3)
         
         # plot
-        fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-        fig.suptitle(f"Interpolation with weight {weight}")
-        ax[0].set_title(img_name1)
-        ax[1].set_title("Interpolation")
-        ax[2].set_title(img_name2)
-        ax[0].imshow(PIL.Image.open(img_path1))
-        ax[0].axis('off')
-        ax[1].imshow(img)
-        ax[1].axis('off')
-        ax[2].imshow(PIL.Image.open(img_path2))
-        ax[2].axis('off')
-        
-        # save plot
-        os.makedirs(self.folder + "/interpolation", exist_ok=True)
-        plt.savefig(self.folder + f"/interpolation/{img_name1}_to_{img_name2}.png")
-        
+        if plot:
+            fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+            fig.suptitle(f"Interpolation with weight {weight}")
+            ax[0].set_title(img_name1)
+            ax[1].set_title("Interpolation")
+            ax[2].set_title(img_name2)
+            ax[0].imshow(PIL.Image.open(img_path1))
+            ax[0].axis('off')
+            ax[1].imshow(img)
+            ax[1].axis('off')
+            ax[2].imshow(PIL.Image.open(img_path2))
+            ax[2].axis('off')
+            
+            # save plot
+            os.makedirs(self.folder + "/interpolation", exist_ok=True)
+            plt.savefig(self.folder + f"/interpolation/{img_name1}_to_{img_name2}.png")
+            
+        # save video
+        if save_video:
+            img1 = self.get_img_for_video(img_path1)
+            img2 = self.get_img_for_video(img_path2)
+            
+            video = imageio.get_writer(self.folder + f'/interpolation/{img_name1}_to_{img_name2}.mp4', mode='I', fps=10, codec='libx264', bitrate='16M')
+            # print (f'Saving optimization progress video "{outdir}/proj.mp4"')
+            for w in np.linspace(0, 1, 100):
+                z3 = (1-w)*z1 + w*z2
+                synth_image = self.synthesize(z3)
+                video.append_data(np.concatenate([img1, synth_image, img2], axis=1))
+            video.close()
+            
         return img
     
-    def apply_latent_dir(self, img_path, latent_dir):
+    def get_img_for_video(self, img_path):
+        target_pil = PIL.Image.open(img_path).convert('RGB')
+        w, h = target_pil.size
+        s = min(w, h)
+        target_pil = target_pil.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2))
+        target_pil = target_pil.resize((self.G.img_resolution, self.G.img_resolution), PIL.Image.LANCZOS)
+        target_uint8 = np.array(target_pil, dtype=np.uint8)
+        return target_uint8
+    
+    def apply_latent_dir(self, img_path, feature, magnitude = 10, feature_dir = None, save_video = False, plot = True):
+        # get img names and paths
+        img_folder, img_name, img_ext = self.split_path(img_path)
+        img_path = self.get_img_path(img_path)
+        
+        # get feature dir
+        feature_dir = "gan/code/stylegan2directions/" if feature_dir is None else feature_dir
+        feature_path = feature_dir + feature + ".npy"
+        
+        # get latent representation
         z = self.get_latent(img_path, step=-1)
-        w = torch.from_numpy(np.load(latent_dir)).to(self.device)
-        return self.synthesize(z - 10*w)
+        
+        # transform feature
+        w = torch.from_numpy(np.load(feature_path)).to(self.device)
+
+         # plot
+        if plot:
+            fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+            fig.suptitle(f"Latent direction: {feature}")
+            ax[0].set_title("Feature reduced")
+            ax[1].set_title("Original image")
+            ax[2].set_title("Feature increased")
+            ax[0].imshow(self.synthesize(z - magnitude*w))
+            ax[0].axis('off')
+            ax[1].imshow(PIL.Image.open(img_path))
+            ax[1].axis('off')
+            ax[2].imshow(self.synthesize(z + magnitude*w))
+            ax[2].axis('off')
+            
+            # save plot
+            os.makedirs(self.folder + "/latent_direction", exist_ok=True)
+            plt.savefig(self.folder + f"/latent_direction/{img_name}_{feature}.{img_ext}")
+            
+        # save video
+        if save_video:
+            img = self.get_img_for_video(img_path)
+            
+            video = imageio.get_writer(self.folder + f'/latent_direction/{img_name}_{feature}.mp4', mode='I', fps=10, codec='libx264', bitrate='16M')
+            for m in np.linspace(-magnitude, magnitude, 100):
+                z_trans = z + m*w
+                synth_image = self.synthesize(z_trans)
+                video.append_data(np.concatenate([img, synth_image], axis=1))
+            video.close()
+        
+        return self.synthesize(z + magnitude*w)
         
 if __name__ == "__main__":
     # img paths
     img1 = "gan/test_imgs/RyanGosling_Barbie.png"
     img2 = "gan/test_imgs/RyanGosling_Notebook.png"
-    latent_dir = "gan/code/stylegan2directions/age.npy"
+    # latent_dir = "gan/code/stylegan2directions/age.npy"
     
     # latent explorer
     le = LatentExplorer("Barbie")
@@ -131,13 +208,10 @@ if __name__ == "__main__":
     # le.reconstruct(img)
 
     # interpolation
-    # img = le.interpolate(img1, img2)
-    # plt.imshow(img)
-    # plt.axis('off')
-    # plt.savefig("gan/test.png")
+    # img = le.interpolate(img1, img2, save_video=True)
     
     # add latent direction
-    # img = le.apply_latent_dir(img2, latent_dir)
+    img = le.apply_latent_dir(img2, "age", save_video=True)
     # plt.imshow(img)
     # plt.axis('off')
     # plt.savefig("gan/test.png")
