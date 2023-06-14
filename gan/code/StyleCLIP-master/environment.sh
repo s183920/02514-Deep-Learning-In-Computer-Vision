@@ -1,6 +1,7 @@
 #!/bin/bash
 
-module load python3/3.8.4
+# module load python3/3.8.4
+module load python3/3.11.3
 module load cuda/11.0
 
 
