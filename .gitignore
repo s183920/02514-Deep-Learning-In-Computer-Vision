@@ -167,3 +167,22 @@ logs/*
 hotdog/logs/*
 *wandb*
 exercises/ex2/data/*
+
+
+# gan
+# Libraries and Models
+gan/code/VQGAN-CLIP-main/CLIP/
+gan/code/VQGAN-CLIP-main/taming-transformers/
+gan/code/VQGAN-CLIP-main/taming/
+gan/code/VQGAN-CLIP-main/checkpoints/
+
+# Editor
+.vscode/
+
+# Operations
+gan/code/VQGAN-CLIP-main/outputs/
+gan/code/VQGAN-CLIP-main/steps/
+
+# Files
+gan/code/VQGAN-CLIP-main/output.png
+gan/code/VQGAN-CLIP-main/steps.mp4
