@@ -195,3 +195,4 @@ gan/ffhq.pkl
 
 
 gan/code/StyleCLIP-master/style_clip_env/*
+gan/results/*
