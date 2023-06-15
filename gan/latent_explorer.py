@@ -10,6 +10,7 @@ import numpy as np
 import PIL
 import shutil
 import imageio
+from tqdm import tqdm
 
 # own modules
 from project import run_projection
@@ -171,21 +172,31 @@ class LatentExplorer:
         target_uint8 = np.array(target_pil, dtype=np.uint8)
         return target_uint8
     
-    def apply_latent_dir(self, img_path, feature, magnitude = 10, feature_dir = None, save_video = False, plot = True):
+    def apply_latent_dir(self, img_path, feature, magnitude = 10, feature_dir = "stylegan", save_video = False, plot = True):
         # get img names and paths
         img_folder, img_name, img_ext = self.split_path(img_path)
         img_path = self.get_img_path(img_path)
         
         # get feature dir
-        feature_dir = "gan/code/stylegan2directions/" if feature_dir is None else feature_dir
-        feature_path = feature_dir + feature + ".npy"
+        if feature_dir == "stylegan":
+            feature_dir = "gan/code/stylegan2directions/" 
+            feature_path = feature_dir + feature + ".npy"
+            
+            # transform feature
+            w = torch.from_numpy(np.load(feature_path)).to(self.device)
+
+        elif feature_dir == "own":
+            # feature_dir = "gan/code/own_directions/"
+            w = torch.from_numpy(self.load_features(feature)).to(self.device)
+        else:
+            raise ValueError("feature_dir must be 'stylegan' or 'own'")
+        
+        
+        
         
         # get latent representation
         z = self.get_latent(img_path, step=-1)
         
-        # transform feature
-        w = torch.from_numpy(np.load(feature_path)).to(self.device)
-
          # plot
         if plot:
             fig, ax = plt.subplots(1, 3, figsize=(15, 5))
@@ -216,6 +227,53 @@ class LatentExplorer:
             video.close()
         
         return self.synthesize(z + magnitude*w)
+    
+    def create_features(self, feature):
+        folder = f"gan/feature_dataset/{feature}"
+        img_paths = folder + "/images"
+        
+        print(os.listdir(img_paths))
+        
+        for cl in os.listdir(img_paths):
+            os.makedirs(folder + "/feature/" + cl, exist_ok=True)
+            rec_dir = folder + "/feature/" + cl + "/latent"
+            os.makedirs(rec_dir, exist_ok=True) 
+            
+            print("Processing class: " + cl)
+            pbar = tqdm(os.listdir(img_paths + "/" + cl))
+            for img_path in pbar:
+                pbar.set_description(f"Processing {img_path}")
+                print(img_path)
+                img_name, img_ext = img_path.split(".")
+                img_path = img_paths + "/" + cl + "/" + img_path
+                
+                l_save_name = rec_dir + "/" + img_name
+                if os.path.exists(l_save_name + ".npz"):
+                    print(f"skipping {l_save_name} as it already exists")
+                else:
+                    l = run_projection(img_path, outdir=rec_dir, num_steps=100, only_latent=True)
+                    np.savez(rec_dir + "/" + img_name, w = l.cpu().numpy())
+                    
+    def load_features(self, feature):
+        folder = f"gan/feature_dataset/{feature}"
+        feature_paths = folder + "/feature"
+
+        ws = []
+        for cl in os.listdir(feature_paths):
+            paths = os.listdir(feature_paths + "/" + cl + "/latent")
+            f = np.zeros((len(paths), self.G.num_ws, self.G.w_dim))
+            print(f.shape)            
+            for idx, feature_path in enumerate(paths):
+                feature_path = feature_paths + "/" + cl + "/latent/" + feature_path
+                # print(feature_path)
+                
+                f[idx] = np.load(feature_path)["w"]
+                
+            ws.append(f.mean(axis=0))
+        
+        return np.array(ws[0] - ws[1])
+      
+      
         
 if __name__ == "__main__":
     # img paths
@@ -224,23 +282,26 @@ if __name__ == "__main__":
     # latent_dir = "gan/code/stylegan2directions/age.npy"
     
     # latent explorer
-    le = LatentExplorer("Barbie")
+    le = LatentExplorer("Sunglasses")
     
     # random image
-    le.random()
+    # le.random()
     
     # reconstruction
     # le.reconstruct(img2, num_steps=500)
 
     # interpolation
-    img = le.interpolate(img1, img2, save_video=True)
+    # img = le.interpolate(img1, img2, save_video=True)
+    
+     # create feature
+    le.create_features("sunglasses")
+    # le.load_features("sunglasses")
     
     # add latent direction
-    img = le.apply_latent_dir(img1, "age", save_video=True)
-    img = le.apply_latent_dir(img2, "age", save_video=True)
-    # plt.imshow(img)
-    # plt.axis('off')
-    # plt.savefig("gan/test.png")
+    # img = le.apply_latent_dir(img1, "sunglasses", feature_dir="own", save_video=True)
+    # img = le.apply_latent_dir(img2, "age", save_video=True)
     
+   
+
     
     

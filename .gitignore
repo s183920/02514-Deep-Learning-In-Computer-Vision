@@ -196,3 +196,4 @@ gan/pretrained_models/*
 
 gan/code/StyleCLIP-master/style_clip_env/*
 gan/results/*
+gan/feature_dataset/*
