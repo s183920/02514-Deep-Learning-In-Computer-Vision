@@ -86,11 +86,11 @@ def image_align(src_file, dst_file, face_landmarks, output_size=256, transform_s
         # Save aligned image.
         img.save(dst_file, 'PNG')
         
-def align_face(img_path):
+def align_face(img_path, save_path = None):
     fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.THREE_D, flip_input=False, device='cuda')
     preds = fa.get_landmarks_from_image(img_path)
     img_path_list = img_path.split(".")
-    save_path = ".".join(img_path_list[:-1]) + "_aligned." + img_path_list[-1]
+    save_path = ".".join(img_path_list[:-1]) + "_aligned." + img_path_list[-1] if save_path is None else save_path
     image_align(img_path, save_path, preds[0])
     return save_path
 
