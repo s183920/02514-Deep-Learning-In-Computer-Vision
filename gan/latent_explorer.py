@@ -2,7 +2,7 @@ import pickle
 import torch
 import sys
 import os
-sys.path.append(os.path.join(os.getcwd(), 'gan/code/stylegan2-ada-pytorch-main/'))
+sys.path.append(os.path.join(os.getcwd(), '02514-Deep-Learning-In-Computer-Vision/gan/code/stylegan2-ada-pytorch-main/'))
 import warnings
 warnings.filterwarnings("ignore")
 import matplotlib.pyplot as plt
@@ -18,9 +18,9 @@ from align import align_face
 class LatentExplorer:
     device = torch.device('cuda')
 
-    def __init__(self, name) -> None:
-        # with open('gan/pretrained_models/ffhq.pkl', 'rb') as f:
-        with open('/zhome/c5/f/138539/02514-Deep-Learning-In-Computer-Vision/gan/pretrained_models/ffhq.pkl', 'rb') as f: # Kat bruger denne
+    def __init__(self, name, align = True) -> None:
+        with open('gan/pretrained_models/ffhq.pkl', 'rb') as f:
+        # with open('/zhome/c5/f/138539/02514-Deep-Learning-In-Computer-Vision/gan/pretrained_models/ffhq.pkl', 'rb') as f: # Kat bruger denne
             self.G = pickle.load(f)['G_ema'].cuda()  # torch.nn.Module
 
         self.name = name
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     le = LatentExplorer("Barbie")
 
     # random image
-    le.random()
+    # le.random()
 
     # reconstruction
     # le.reconstruct(img2, num_steps=500)
