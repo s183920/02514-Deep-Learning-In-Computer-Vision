@@ -32,6 +32,28 @@ class LatentExplorer:
         os.makedirs(self.folder + "/original", exist_ok=True)
         os.makedirs(self.folder + "/aligned", exist_ok=True)
         
+    def random(self, nrows = 5, ncols = 5, seed = 0):
+        num_imgs = nrows * ncols
+        
+        # generate random latent vectors
+        z = torch.randn(num_imgs, self.G.z_dim).cuda()
+            
+        # save images
+        fig, axes = plt.subplots(nrows, ncols, figsize=(ncols*3, nrows*3))
+        for i in range(num_imgs):
+            w = self.G.mapping(z[i].unsqueeze(0), c = None, truncation_psi=0.5, truncation_cutoff=8)
+            img_i = self.synthesize(w.squeeze())
+            
+            ax = axes.flatten()[i]
+            ax.imshow(img_i)
+            ax.axis('off')
+        
+        os.makedirs(self.folder + "/random", exist_ok=True)
+        plt.savefig(self.folder + "/random/random.png")
+            
+            # img_i.save(self.folder + "/original/" + str(i) + ".png")
+
+        
     def split_path(self, img_path):
         img_folder, img_name = os.path.split(img_path)
         img_name, img_ext = os.path.splitext(img_name)
@@ -52,7 +74,7 @@ class LatentExplorer:
         
         return img_path
             
-    def reconstruct(self, img_path):
+    def reconstruct(self, img_path, num_steps = 10):
         # get img names and paths
         img_folder, img_name, img_ext = self.split_path(img_path)
         img_path = self.get_img_path(img_path)
@@ -61,7 +83,7 @@ class LatentExplorer:
         outdir = self.folder + "/reconstruction/" + img_name
          
         img_path = self.get_img_path(img_path)
-        run_projection(img_path, outdir=outdir)
+        run_projection(img_path, outdir=outdir, num_steps=num_steps)
         
     def get_latent(self, img_path, step = None):
         # get img names and paths
@@ -204,14 +226,21 @@ if __name__ == "__main__":
     # latent explorer
     le = LatentExplorer("Barbie")
     
+    # random image
+    le.random()
+    
     # reconstruction
-    # le.reconstruct(img)
+    # le.reconstruct(img2, num_steps=500)
 
     # interpolation
-    # img = le.interpolate(img1, img2, save_video=True)
+    img = le.interpolate(img1, img2, save_video=True)
     
     # add latent direction
+    img = le.apply_latent_dir(img1, "age", save_video=True)
     img = le.apply_latent_dir(img2, "age", save_video=True)
     # plt.imshow(img)
     # plt.axis('off')
     # plt.savefig("gan/test.png")
+    
+    
+    
