@@ -34,7 +34,7 @@ parser.add_argument(
 parser.add_argument(
     '--prompt',
     type=str,
-    default='An image with the face of a blonde woman with blonde hair and purple eyes',
+    default='An image with the face of a blonde woman with blue hair and purple eyes',
     help='',
 )
 parser.add_argument(
@@ -150,24 +150,24 @@ def compute_perceptual_loss(gen_img, ref_img):
         gen_feats = module(gen_feats)
         if name in vgg_layer_name_mapping.keys():
             loss += torch.nn.functional.mse_loss(ref_feats, gen_feats)
-        
+
         if idx >= len_vgg_layer_mappings:
             break
-    
+
     return loss/len_vgg_layer_mappings
 
 counter = 0
 while True:
     dlatents = latents.repeat(1,18,1)
     img = g_synthesis(dlatents)
-    
+
     # NOTE: clip normalization did not seem to have much effect
     # img = clip_normalize(img)
 
     loss = compute_clip_loss(img, args.prompt)
 
     # NOTE: uncomment to use perceptual loos. Still WIP. You will need to define
-    # the `ref_img_path` to use it. The image referenced will be the one 
+    # the `ref_img_path` to use it. The image referenced will be the one
     # used to condition the generation.
     # perceptual_loss = compute_perceptual_loss(img, ref_img)
     # loss = loss + perceptual_loss

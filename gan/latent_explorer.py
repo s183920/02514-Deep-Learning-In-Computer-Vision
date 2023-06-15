@@ -85,7 +85,7 @@ class LatentExplorer:
         # set output dir
         outdir = self.folder + "/reconstruction/" + img_name
 
-        img_path = self.get_img_path(img_path)
+        # img_path = self.get_img_path(img_path)
         run_projection(img_path, outdir=outdir, num_steps=num_steps)
 
     def get_latent(self, img_path, step = None):
@@ -281,19 +281,20 @@ if __name__ == "__main__":
     # img paths
     img1 = "gan/test_imgs/RyanGosling_Barbie.png"
     img2 = "gan/test_imgs/RyanGosling_Notebook.png"
+    img3 = "gan/test_imgs/Ryan_Seacrest.jpeg"
     # latent_dir = "gan/code/stylegan2directions/age.npy"
 
     # latent explorer
-    le = LatentExplorer("Poster")
+    le = LatentExplorer("Poster", align=True)
 
     # random image
-    # le.random()
+    le.random()
 
     # reconstruction
-    # le.reconstruct(img2, num_steps=500)
+    # le.reconstruct(img1, num_steps=500)
 
     # interpolation
-    # img = le.interpolate(img1, img2, save_video=True)
+    # img = le.interpolate(img3, img2, save_video=True)
 
      # create feature
     # le.create_features("sunglasses")
@@ -301,4 +302,4 @@ if __name__ == "__main__":
 
     # add latent direction
     # img = le.apply_latent_dir(img1, "sunglasses", feature_dir="own", save_video=True)
-    # img = le.apply_latent_dir(img2, "age", save_video=True)
+    # img = le.apply_latent_dir(img3, "age", save_video=True)
