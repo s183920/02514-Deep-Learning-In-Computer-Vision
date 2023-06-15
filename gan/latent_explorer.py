@@ -205,7 +205,11 @@ class LatentExplorer:
 
         elif feature_dir == "own":
             # feature_dir = "gan/code/own_directions/"
-            w = torch.from_numpy(self.load_features(feature)).to(self.device)
+            # w = torch.from_numpy(self.load_features(feature)).to(self.device)
+            
+            feature_dir = "gan/feature_dataset/features/" 
+            w = torch.from_numpy(np.load(feature_dir + feature + ".npz")["w"].reshape(18, 512)).to(self.device)
+
         else:
             raise ValueError("feature_dir must be 'stylegan' or 'own'")
         
@@ -311,14 +315,14 @@ if __name__ == "__main__":
 
     # interpolation
     # img = le.interpolate(img1, img2, save_video=True)
-    le.get_interpolation_plot(img1, img3)
+    # le.get_interpolation_plot(img1, img3)
     
      # create feature
     # le.create_features("sunglasses")
     # le.load_features("sunglasses")
     
     # add latent direction
-    # img = le.apply_latent_dir(img1, "sunglasses", feature_dir="own", save_video=True)
+    img = le.apply_latent_dir(img1, "sunglasses", feature_dir="own", save_video=True)
     # img = le.apply_latent_dir(img2, "age", save_video=True)
     
    
