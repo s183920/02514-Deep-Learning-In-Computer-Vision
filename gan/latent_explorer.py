@@ -33,7 +33,7 @@ class LatentExplorer:
         os.makedirs(self.folder + "/original", exist_ok=True)
         os.makedirs(self.folder + "/aligned", exist_ok=True)
         
-    def random(self, nrows = 5, ncols = 5, seed = 0):
+    def random(self, nrows = 1, ncols = 6, seed = 5):
         num_imgs = nrows * ncols
         
         # generate random latent vectors
@@ -50,6 +50,7 @@ class LatentExplorer:
             ax.axis('off')
         
         os.makedirs(self.folder + "/random", exist_ok=True)
+        fig.tight_layout()
         plt.savefig(self.folder + "/random/random.png")
             
             # img_i.save(self.folder + "/original/" + str(i) + ".png")
@@ -96,7 +97,7 @@ class LatentExplorer:
         if os.path.exists(rep_path):
             representation =  np.load(rep_path)['w']
         else:
-            self.reconstruct(img_path)
+            self.reconstruct(img_path, num_steps=100)
             representation = np.load(rep_path)['w']
         
         if step is None:
@@ -282,10 +283,10 @@ if __name__ == "__main__":
     # latent_dir = "gan/code/stylegan2directions/age.npy"
     
     # latent explorer
-    le = LatentExplorer("Sunglasses")
+    le = LatentExplorer("Poster")
     
     # random image
-    # le.random()
+    le.random()
     
     # reconstruction
     # le.reconstruct(img2, num_steps=500)
@@ -294,7 +295,7 @@ if __name__ == "__main__":
     # img = le.interpolate(img1, img2, save_video=True)
     
      # create feature
-    le.create_features("sunglasses")
+    # le.create_features("sunglasses")
     # le.load_features("sunglasses")
     
     # add latent direction
