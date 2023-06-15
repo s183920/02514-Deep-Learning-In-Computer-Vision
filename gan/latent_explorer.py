@@ -33,7 +33,7 @@ class LatentExplorer:
         os.makedirs(self.folder + "/original", exist_ok=True)
         os.makedirs(self.folder + "/aligned", exist_ok=True)
         
-    def random(self, nrows = 1, ncols = 6, seed = 5):
+    def random(self, nrows = 1, ncols = 6):
         num_imgs = nrows * ncols
         
         # generate random latent vectors
@@ -83,8 +83,7 @@ class LatentExplorer:
         
         # set output dir
         outdir = self.folder + "/reconstruction/" + img_name
-         
-        img_path = self.get_img_path(img_path)
+     
         run_projection(img_path, outdir=outdir, num_steps=num_steps)
         
     def get_latent(self, img_path, step = None):
@@ -97,7 +96,7 @@ class LatentExplorer:
         if os.path.exists(rep_path):
             representation =  np.load(rep_path)['w']
         else:
-            self.reconstruct(img_path, num_steps=100)
+            self.reconstruct(img_path, num_steps=500)
             representation = np.load(rep_path)['w']
         
         if step is None:
@@ -164,6 +163,24 @@ class LatentExplorer:
             
         return img
     
+    def get_interpolation_plot(self, img_path1, img_path2, num_imgs = 6):
+        os.makedirs(self.folder + "/interpolation", exist_ok=True)
+        
+        img_folder1, img_name1, img_ext1 = self.split_path(img_path1)
+        img_folder2, img_name2, img_ext2 = self.split_path(img_path2)
+        
+        fig, axes = plt.subplots(1, num_imgs, figsize=(3*num_imgs, 3))
+        # fig.suptitle(f"Interpolation between {img_path1} and {img_path2}")
+        for idx, w in enumerate(np.linspace(0, 1, num_imgs)):
+            img = self.interpolate(img_path1, img_path2, weight=w, plot=False, save_video=False)
+            ax = axes[idx]
+            ax.imshow(img)
+            ax.axis('off')
+            
+        # save plot        
+        fig.tight_layout()
+        plt.savefig(self.folder + f"/interpolation/{img_name1}_to_{img_name2}_range.png")
+        
     def get_img_for_video(self, img_path):
         target_pil = PIL.Image.open(img_path).convert('RGB')
         w, h = target_pil.size
@@ -280,19 +297,21 @@ if __name__ == "__main__":
     # img paths
     img1 = "gan/test_imgs/RyanGosling_Barbie.png"
     img2 = "gan/test_imgs/RyanGosling_Notebook.png"
+    img3 = "gan/test_imgs/Ryan_Seacrest.jpeg"
     # latent_dir = "gan/code/stylegan2directions/age.npy"
     
     # latent explorer
-    le = LatentExplorer("Poster")
+    le = LatentExplorer("Poster", align = True)
     
     # random image
-    le.random()
+    # le.random()
     
     # reconstruction
-    # le.reconstruct(img2, num_steps=500)
+    # le.reconstruct(img1, num_steps=500)
 
     # interpolation
     # img = le.interpolate(img1, img2, save_video=True)
+    le.get_interpolation_plot(img1, img3)
     
      # create feature
     # le.create_features("sunglasses")
