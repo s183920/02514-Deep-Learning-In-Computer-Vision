@@ -190,7 +190,7 @@ class LatentExplorer:
         target_uint8 = np.array(target_pil, dtype=np.uint8)
         return target_uint8
     
-    def apply_latent_dir(self, img_path, feature, magnitude = 10, feature_dir = "stylegan", save_video = False, plot = True):
+    def apply_latent_dir(self, img_path, feature, magnitude = 10, feature_dir = "stylegan", save_video = False, plot = True, plot_grad = False):
         # get img names and paths
         img_folder, img_name, img_ext = self.split_path(img_path)
         img_path = self.get_img_path(img_path)
@@ -236,6 +236,29 @@ class LatentExplorer:
             # save plot
             os.makedirs(self.folder + "/latent_direction", exist_ok=True)
             plt.savefig(self.folder + f"/latent_direction/{img_name}_{feature}.{img_ext}")
+            plt.show()
+            
+        # plot gradient
+        if plot_grad:
+            img = self.get_img_for_video(img_path)
+            
+            # img = None
+            for m in [0, 5, 7.5, 10, 15, 20]:
+            # for m in np.linspace(0, magnitude, 5):
+                z_trans = z + m*w
+                synth_image = self.synthesize(z_trans)
+                if img is None:
+                    img = synth_image
+                else:
+                    img = np.concatenate([img, synth_image], axis=1)
+                
+             # save plot
+            os.makedirs(self.folder + "/latent_direction", exist_ok=True)
+            plt.imshow(img)
+            plt.axis('off')
+            plt.tight_layout()
+            plt.savefig(self.folder + f"/latent_direction/{img_name}_{feature}_grad.pdf")
+            plt.show()
             
         # save video
         if save_video:
@@ -302,6 +325,7 @@ if __name__ == "__main__":
     img1 = "gan/test_imgs/RyanGosling_Barbie.png"
     img2 = "gan/test_imgs/RyanGosling_Notebook.png"
     img3 = "gan/test_imgs/Ryan_Seacrest.jpeg"
+    img4 = "gan/test_imgs/RyanReynolds.jpg"
     # latent_dir = "gan/code/stylegan2directions/age.npy"
     
     # latent explorer
@@ -322,7 +346,7 @@ if __name__ == "__main__":
     # le.load_features("sunglasses")
     
     # add latent direction
-    img = le.apply_latent_dir(img1, "sunglasses", feature_dir="own", save_video=True)
+    img = le.apply_latent_dir(img4, "sunglasses", feature_dir="own", plot_grad=True, plot = False)
     # img = le.apply_latent_dir(img2, "age", save_video=True)
     
    
