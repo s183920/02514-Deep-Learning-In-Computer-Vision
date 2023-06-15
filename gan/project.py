@@ -22,7 +22,8 @@ def run_projection(
     outdir: str = 'gan/out',
     save_video: bool = True,
     seed: int = 0,
-    num_steps: int = 10
+    num_steps: int = 10,
+    only_latent = False
 ):
     """Project given image to the latent space of pretrained network pickle.
 
@@ -59,6 +60,10 @@ def run_projection(
         verbose=True
     )
     print (f'Elapsed: {(perf_counter()-start_time):.1f} s')
+    
+    
+    if only_latent:
+        return projected_w_steps[-1].unsqueeze(0)
 
     # Render debug output: optional video and projected image and W vector.
     os.makedirs(outdir, exist_ok=True)
@@ -72,7 +77,7 @@ def run_projection(
             video.append_data(np.concatenate([target_uint8, synth_image], axis=1))
         video.close()
 
-    # Save final projected frame and W vector.
+    # Save final projected frame and W vector.       
     target_pil.save(f'{outdir}/target.png')
     projected_w = projected_w_steps[-1]
     synth_image = G.synthesis(projected_w.unsqueeze(0), noise_mode='const')
