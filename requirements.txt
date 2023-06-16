@@ -4,5 +4,6 @@ wandb
 torchcam
 torchsummary
 torchviz
+face-alignment
 # torch 
 # torchvision

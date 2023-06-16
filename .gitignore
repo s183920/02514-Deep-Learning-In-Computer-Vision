@@ -191,7 +191,7 @@ gan/pretrained_models/*
 
 
 gan/ffhq.pkl
-
+gan/out
 
 
 gan/code/StyleCLIP-master/style_clip_env/*
