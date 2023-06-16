@@ -159,9 +159,41 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 exercises/ex1/data/*
+exercises/ex1/cifar10_data/*
+hotdog/data/*
+hotdog/logs/*
+logs/*
+logs/*
+hotdog/logs/*
+*wandb*
+exercises/ex2/data/*
+
+# Libraries and Models
+gan/code/VQGAN-CLIP-main/CLIP/
+gan/code/VQGAN-CLIP-main/taming-transformers/
+gan/code/VQGAN-CLIP-main/taming/
+gan/code/VQGAN-CLIP-main/checkpoints/
+
+# Editor
+.vscode/
+
+# Operations
+gan/code/VQGAN-CLIP-main/outputs/
+gan/code/VQGAN-CLIP-main/steps/
+
+# Files
+gan/code/VQGAN-CLIP-main/output.png
+gan/code/VQGAN-CLIP-main/steps.mp4
+
+# gan
+gan/pretrained_models/*
 
 
-#segmentation wandb
-segmentation/logs
-gan/out
-gan/
+
+
+
+
+
+gan/code/StyleCLIP-master/style_clip_env/*
+gan/results/*
+gan/feature_dataset/*
