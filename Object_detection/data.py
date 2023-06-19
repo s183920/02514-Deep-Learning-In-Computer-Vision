@@ -160,11 +160,13 @@ def get_dataloader(dataset):
 
     return data_loader
 
-def show_img(img, annotations, label_dict, ax = None):
+def show_img(image, annotations, label_dict, ax = None):
     """Show image with annotations"""
+    
     if ax is None:
         fig, ax = plt.subplots()
     
+    img = image.copy()
     img = img.cpu().numpy().transpose(1, 2, 0)
     # img = np.clip(img, 0, 1)
     

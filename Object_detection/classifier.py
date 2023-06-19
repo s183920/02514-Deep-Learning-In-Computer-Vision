@@ -70,7 +70,7 @@ class TacoClassifier:
 
         # set model
         # print(f"Setting model to {model}")
-        self.set_model("SimpleCNN" if model is None else model)
+        self.set_model("Resnet50" if model is None else model)
 
 
         # set wandb
