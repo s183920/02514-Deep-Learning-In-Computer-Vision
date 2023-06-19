@@ -24,7 +24,7 @@ class Resnet50(nn.Module):
             nn.ReLU(),
             nn.Linear(256,100),
             nn.ReLU(),
-            nn.Linear(100,2),
+            nn.Linear(100,61),
         )
         
         # replace fc layer

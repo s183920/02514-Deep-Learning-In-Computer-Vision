@@ -18,5 +18,6 @@ default_classifier_config = {
 	"num_epochs" : 25,
 	### model params
 	"finetune": False,
+    "ss_size" : (100, 100),
 }
 

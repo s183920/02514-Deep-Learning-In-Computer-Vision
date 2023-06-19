@@ -38,7 +38,15 @@ class TacoDataset(torch.utils.data.Dataset):
         print(f"Number of train images: {len(self.train_idxs)}")
         print(f"Number of val images: {len(self.val_idxs)}")
         print(f"Number of test images: {len(self.test_idxs)}")
-        
+    
+    def get_img(self, img_id):
+        # path for input image
+        path = self.coco.loadImgs(img_id)[0]['file_name']
+        # open the input image
+        img = Image.open(os.path.join(self.root, path))
+
+        return img
+
     def __getitem__(self, idx):
         if self.datatype == "train":
             idx = self.train_idxs[idx]
@@ -55,10 +63,8 @@ class TacoDataset(torch.utils.data.Dataset):
         ann_ids = coco.getAnnIds(imgIds=img_id)
         # Dictionary: target coco_annotation file for an image
         coco_annotation = coco.loadAnns(ann_ids)
-        # path for input image
-        path = coco.loadImgs(img_id)[0]['file_name']
-        # open the input image
-        img = Image.open(os.path.join(self.root, path))
+        
+        img = self.get_img(img_id)
 
         
 
