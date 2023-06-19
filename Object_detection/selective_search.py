@@ -32,11 +32,13 @@ def selective_search(image):
 def draw_rectangles(image, rects, annotation):
     # Create a copy of the original image
     image_copy = image.copy()
+    if image_copy.dtype == "float32":
+        image_copy *= 255
 
     # Draw rectangles on the image
     for r in rects:
         x1, y1, x2, y2 = rect_coordinates(r, annotation)
-        x, y, w, h = int(x), int(y), int(w), int(h)
+        # x, y, w, h = int(x), int(y), int(w), int(h)
         cv2.rectangle(image_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
     # Convert the image from BGR to RGB
@@ -58,6 +60,8 @@ def rect_coordinates(rect, annotation):
     y1 /= annotation["height_scale"]
     x2 /= annotation["width_scale"]
     y2 /= annotation["height_scale"]
+
+    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
     return x1, y1, x2, y2
 
