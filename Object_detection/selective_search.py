@@ -1,16 +1,11 @@
-from data import TacoDataset, get_dataloader, show_img
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
-# data
-dataset = TacoDataset(datatype="train", img_size=(800, 800))
-data_loader = get_dataloader(dataset)
 
 
 
-
-def selective_search(image):
+def selective_search(img):
     """Performs selective search on the input image (tensor)."""
     print("Running selective search..")
     # Convert image to cv2
@@ -122,7 +117,11 @@ def rect_coordinates(rect, annotation):
     return x1, y1, x2, y2
 
 if __name__ == "__main__":
+    from data import TacoDataset, get_dataloader, show_img
 
+    # data
+    dataset = TacoDataset(datatype="train", img_size=(800, 800))
+    data_loader = get_dataloader(dataset)
 
     # perform selective search
     for imgs, annotations in data_loader:

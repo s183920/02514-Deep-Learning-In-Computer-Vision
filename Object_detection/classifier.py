@@ -1,12 +1,96 @@
 from hparams import default_classifier_config, wandb_defaults
 import torch
 import torch.nn.functional as F
+import torchvision
+from torchvision import transforms
+import torch.utils.data
 from datetime import datetime as dt
 from utils import download_model
 from model import models
 import os
 import wandb
 from tqdm import tqdm
+from data import TacoDataset, get_dataloader
+import pickle
+from selective_search import selective_search, rect_coordinates
+import matplotlib.pyplot as plt
+
+class TacoClassifierDataset(torch.utils.data.Dataset):
+    def __init__(self, datatype = "train", ss_size = None):
+        super().__init__()
+
+        self.org_data = TacoDataset(datatype = datatype, img_size = ss_size)
+
+        self.data_path = "Object_detection/cls_data/" + datatype + "_" + str(ss_size) + ".pkl"
+        if os.path.exists(self.data_path):
+            print("Loading data")
+            self.load_data()
+        else:
+            print("Creating data")
+            self.create_data()
+
+
+        self.transforms = transforms.Compose([
+            transforms.Resize((128, 128)),
+            # transforms.ToTensor(),
+        ])
+        
+    def create_data(self):
+        self.labels = []
+        self.data = []
+
+        for idx, data in tqdm(enumerate(self.org_data), total = len(self.org_data)):
+            img, gt_ann = data
+            img_org = self.org_data.get_img(gt_ann["image_id"].item())
+            img_org = self.org_data.transforms(img_org)
+
+            # get selective search boxes
+            proposal_boxes = selective_search(img)
+            proposal_boxes[:, 2] += proposal_boxes[:, 0]
+            proposal_boxes[:, 3] += proposal_boxes[:, 1]
+            proposal_boxes = torch.tensor(proposal_boxes, dtype = torch.int32)
+
+            # get ious
+            ious = torchvision.ops.box_iou(proposal_boxes, gt_ann["boxes"])
+
+            # select foreground and background boxes
+            max_ious, box_idx = torch.max(ious, dim = 1)
+            foreground_boxes = proposal_boxes[max_ious >= 0.5]
+            background_boxes = proposal_boxes[max_ious < 0.5]
+
+            for box in foreground_boxes:
+                xmin, ymin, xmax, ymax = box
+                proposal_img = img_org[:, xmin:xmax, ymin:ymax]
+                self.data.append(proposal_img.unsqueeze(0))
+                self.labels.append(gt_ann["labels"][box_idx])
+
+            for box_idx in torch.randperm(len(background_boxes))[:len(foreground_boxes)*3]:
+                xmin, ymin, xmax, ymax = background_boxes[box_idx]
+                proposal_img = img_org[:, xmin:xmax, ymin:ymax]
+                self.data.append(proposal_img.unsqueeze(0))
+                self.labels.append(torch.tensor(len(self.org_data.category_id_to_name)))
+
+            if idx > 5:
+                break
+
+        # save data
+        os.makedirs(os.path.dirname(self.data_path), exist_ok = True)
+        with open(self.data_path, "wb") as f:
+            pickle.dump((self.data, self.labels), f)
+
+
+    def load_data(self):
+        with open(self.data_path, "rb") as f:
+            self.data, self.labels = pickle.load(f)
+
+        print("Loaded data from", self.data_path)
+        print("Number of samples:", len(self))
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        return self.transforms(self.data[idx]), self.labels[idx]
 
 class TacoClassifier:
     def __init__(self, project = "Taco", name = None, model = None, config = None, use_wandb = True, verbose = True, show_test_images = False, model_save_freq = None, **kwargs):
@@ -105,19 +189,26 @@ class TacoClassifier:
 
 
     def set_dataset(self):
-        raise NotImplementedError("set_dataset not implemented")
-    #     self.data_train = HotdogDataset(**self.config.get("train_dataset_kwargs", {}))
-    #     self.data_test = HotdogDataset(train=False, **self.config.get("test_dataset_kwargs", {}))
-             
-    #     self.train_loader, self.val_loader = self.data_train.get_dataloader(**self.config.get("train_dataloader_kwargs", {}))
-    #     self.test_loader = self.data_test.get_dataloader(**self.config.get("test_dataloader_kwargs", {}))
+        self.data_train = TacoClassifierDataset(datatype = "train", ss_size=self.config["ss_size"])
+        self.data_test = TacoClassifierDataset(datatype = "test", ss_size=self.config["ss_size"])
+        self.data_val = TacoClassifierDataset(datatype = "val", ss_size=self.config["ss_size"])
 
+        self.train_loader = torch.utils.data.DataLoader(self.data_train,
+                                            batch_size=32,
+                                            shuffle=True,
+                                            num_workers=4)
+        
+        self.test_loader = torch.utils.data.DataLoader(self.data_test, batch_size=32, shuffle=False, num_workers=4)
+        self.val_loader = torch.utils.data.DataLoader(self.data_val, batch_size=32, shuffle=False, num_workers=4)
+  
     def set_optimizer(self):
         optimizer = self.config.get("optimizer")
         
         # set default lr if not set
         if optimizer.lower() == "sgd" and "lr" not in self.config:
             self.config["lr"] = 0.01
+        elif optimizer.lower() == "adam" and "lr" not in self.config:
+            self.config["lr"] = 0.001
             
         # set optimizer
         self.optimizer = torch.optim.__dict__.get(optimizer)(self.model.parameters(), lr = self.config["lr"])
@@ -314,9 +405,12 @@ class TacoClassifier:
 
 if __name__ == "__main__":
     classifier = TacoClassifier(project="TacoClassifier", name = None, 
-                                show_test_images=False, model = "resnet50", use_wandb=True, 
+                                show_test_images=False, model = "resnet50", use_wandb=False, 
+                                num_epochs=10,
                                 optimizer = "Adam",)
 
-    classifier.train(num_epochs=100)
+    classifier.train()
 
     # classifier.test(save_images=10)
+
+    # dataset = TacoClassifierDataset(ss_size=(100, 100))
