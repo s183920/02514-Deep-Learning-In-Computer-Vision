@@ -12,7 +12,7 @@ import matplotlib.patches as patches
 class TacoDataset(torch.utils.data.Dataset):
     def __init__(self, datatype = "train", img_size = None):
         self.datatype = datatype
-        self.root = '/dtu/datasets1/02514/data_wastedetection/'
+        self.root = '/mnt/c/Users/frede/Downloads/data_wastedetection/'
         self.anns_file_path = self.root + '/' + 'annotations.json'
         self.coco = COCO(self.anns_file_path)
         self.ids = list(sorted(self.coco.imgs.keys()))
