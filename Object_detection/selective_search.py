@@ -4,10 +4,8 @@ import matplotlib.patches as patches
 import numpy as np
 
 
-
-def selective_search(img):
-    """Performs selective search on the input image (tensor)."""
-    print("Running selective search..")
+def selective_search(img, max_proposals):
+    """Performs selective search on the input image (tensor) and limits the number of proposals."""
     # Convert image to cv2
     img_array = img.cpu().numpy().transpose(1, 2, 0)
     img_cv2 = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
@@ -22,81 +20,85 @@ def selective_search(img):
     ss.switchToSelectiveSearchFast()
     rects = ss.process()
 
+    # Limit the number of proposals
+    if len(rects) > max_proposals:
+        rects = rects[:max_proposals]
+
     # Return the bounding boxes
     return rects
 
 
-def NMS(rect_list, threshold = 0.4):
-    """
-        Non maximum supression (NMS) to remove overlapping bounding boxes. 
-        Default behavior is 40% of the boxes is allowed to be overlapping. Else other boxes are removed. 
-    """
-    print("Running Non-Maximum Supression!")
-    if len(rect_list) == 0:
-        return []
-    print("Original no of bboxes: ", len(rect_list))
-    x1 = rect_list[:, 0]  # x coordinate of the top-left corner
-    y1 = rect_list[:, 1]  # y coordinate of the top-left corner
-    x2 = rect_list[:, 2]  # x coordinate of the bottom-right corner
-    y2 = rect_list[:, 3]  # y coordinate of the bottom-right corner
-
-    # Compute area.
-    areas = (x2-x1 + 1) * (y2-y1 +1) # Adding +1 to pad for border pixels. 
-
-    indices = np.arange(len(x1))
-
-    for i, box in enumerate(rect_list):
-        temp_indices = indices[indices != i]
-        xx1 = np.maximum(box[0], rect_list[temp_indices,0])
-        yy1 = np.maximum(box[1], rect_list[temp_indices,1])
-        xx2 = np.minimum(box[2], rect_list[temp_indices,2])
-        yy2 = np.minimum(box[3], rect_list[temp_indices,3])
-        w = np.maximum(0, xx2 - xx1 + 1)
-        h = np.maximum(0, yy2 - yy1 + 1)
-        # compute the ratio of overlap
-        overlap = (w * h) / areas[temp_indices]
-        #print("overlap is: ",overlap)
+def non_maximum_suppression(boxes, scores, threshold):
+    """Applies non-maximum suppression to the bounding boxes based on their scores and IoU threshold."""
+    # Sort boxes by scores in descending order
+    sorted_indices = np.argsort(scores)[::-1]
+    boxes = boxes[sorted_indices]
     
-    indices = [i for i, num in enumerate(overlap) if num > threshold]
-    #print("Theeese exceed the threshold: ", indices)
-    print("Final no of boxes after NMS", len(indices))
+    # Initialize a list to store the selected box indices
+    selected_indices = []
+    
+    # Iterate over the sorted boxes
+    for i in range(len(boxes)):
+        box = boxes[i]
         
-    return rect_list[indices].astype(int)
+        # Calculate IoU with previously selected boxes
+        ious = calculate_iou(box, boxes[selected_indices])
+        
+        # Check for NaN values in ious array
+        if np.isnan(ious).any():
+            continue
+        
+        # Get indices of boxes with IoU less than the threshold
+        overlapping_indices = np.where(ious > threshold)[0]
+        
+        # Check if the box overlaps with any previously selected boxes
+        if len(overlapping_indices) == 0:
+            selected_indices.append(i)
     
+    # Return the selected boxes
+    return boxes[selected_indices]
 
 
-def drawReduced(image, rect_list):
-    image_copy = image.copy()
-    if image_copy.dtype == "float32":
-        image_copy *= 255
+def calculate_iou(box, boxes):
+    """Calculates the Intersection over Union (IoU) between a box and a list of boxes."""
+    # Calculate intersection area
+    x1 = np.maximum(box[0], boxes[:, 0])
+    y1 = np.maximum(box[1], boxes[:, 1])
+    x2 = np.minimum(box[2], boxes[:, 2])
+    y2 = np.minimum(box[3], boxes[:, 3])
+    
+    intersection_area = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0)
+    
+    # Calculate union area
+    box_area = (box[2] - box[0]) * (box[3] - box[1])
+    boxes_area = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+    union_area = box_area + boxes_area - intersection_area
+    
+    # Calculate IoU
+    print(intersection_area, union_area)
+    iou = intersection_area / union_area
+    
+    return iou
 
 
-    for box in rect_list:
-        cv2.rectangle(image_copy, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-    image_rgb = cv2.cvtColor(image_copy, cv2.COLOR_BGR2RGB)
-    return image_rgb.astype("uint8")
+
+
 def draw_rectangles(image, rects, annotation):
-    rect_list = []
     # Create a copy of the original image
     image_copy = image.copy()
     if image_copy.dtype == "float32":
         image_copy *= 255
-   
+
     # Draw rectangles on the image
     for r in rects:
         x1, y1, x2, y2 = rect_coordinates(r, annotation)
-        rect_list.append((x1,y1,x2,y2))
-        array = np.array(rect_list)
-        # # x, y, w, h = int(x), int(y), int(w), int(h)
         cv2.rectangle(image_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
-    
+
     # Convert the image from BGR to RGB
-    print("appended coordinates to np.Array")
     image_rgb = cv2.cvtColor(image_copy, cv2.COLOR_BGR2RGB)
-    
 
+    return image_rgb.astype("uint8")
 
-    return image_rgb.astype("uint8"), array
 
 def rect_coordinates(rect, annotation):
     #print("Converting coordinates")
@@ -127,18 +129,32 @@ if __name__ == "__main__":
     for imgs, annotations in data_loader:
         for img, annotation in zip(imgs, annotations):
             # run selective search
-            results = selective_search(img)
-            # show results
+            results = selective_search(img,max_proposals=100)
+
+            # Convert results to array format
+            boxes = np.array(results)
+            scores = np.ones(len(results))  # Dummy scores for all boxes (e.g., all 1s)
+
+            # Apply non-maximum suppression
+            threshold = 0.3 # Example threshold value
+            reduced_boxes = non_maximum_suppression(boxes, scores, threshold)
+
+            # Show results
             fig, ax = plt.subplots()
-            img_orgBox, array = draw_rectangles(img.cpu().numpy().transpose(1, 2, 0), results, annotation)
+            img_orgBox = draw_rectangles(
+                img.cpu().numpy().transpose(1, 2, 0), results, annotation
+            )
             ax.imshow(img_orgBox)
             ax.set_axis_off()
             plt.savefig("OriginalBBOX.png")
-            ReducedBB = NMS(array, threshold=0.3)
-            reducedImg = drawReduced(img.cpu().numpy().transpose(1,2,0), ReducedBB)
+
+            reducedImg = draw_rectangles(
+                img.cpu().numpy().transpose(1, 2, 0), reduced_boxes, annotation
+            )
             ax.imshow(reducedImg)
             ax.set_axis_off()
             plt.savefig("NMSBBOX.png")
+
             break
-            
+
         break
