@@ -30,10 +30,10 @@ class TacoClassifierDataset(torch.utils.data.Dataset):
             self.create_data()
 
 
-        self.transforms = transforms.Compose([
-            transforms.Resize((128, 128)),
-            # transforms.ToTensor(),
-        ])
+        # self.transforms = transforms.Compose([
+        #     transforms.Resize((128, 128)),
+        #     # transforms.ToTensor(),
+        # ])
         
     def create_data(self):
         self.labels = []
@@ -54,23 +54,24 @@ class TacoClassifierDataset(torch.utils.data.Dataset):
             ious = torchvision.ops.box_iou(proposal_boxes, gt_ann["boxes"])
 
             # select foreground and background boxes
-            max_ious, box_idx = torch.max(ious, dim = 1)
+            max_ious, box_idxs = torch.max(ious, dim = 1)
             foreground_boxes = proposal_boxes[max_ious >= 0.5]
             background_boxes = proposal_boxes[max_ious < 0.5]
 
-            for box in foreground_boxes:
-                xmin, ymin, xmax, ymax = box
-                proposal_img = img_org[:, xmin:xmax, ymin:ymax]
-                self.data.append(proposal_img.unsqueeze(0))
-                self.labels.append(gt_ann["labels"][box_idx])
+            if len(foreground_boxes) > 0:
+                for i, box in enumerate(foreground_boxes):
+                    xmin, ymin, xmax, ymax = box
+                    proposal_img = img_org[:, xmin:xmax, ymin:ymax]
+                    self.data.append(proposal_img)
+                    self.labels.append(gt_ann["labels"][box_idxs[i]])
 
-            for box_idx in torch.randperm(len(background_boxes))[:len(foreground_boxes)*3]:
-                xmin, ymin, xmax, ymax = background_boxes[box_idx]
-                proposal_img = img_org[:, xmin:xmax, ymin:ymax]
-                self.data.append(proposal_img.unsqueeze(0))
-                self.labels.append(torch.tensor(len(self.org_data.category_id_to_name)))
+                for box_idx in torch.randperm(len(background_boxes))[:len(foreground_boxes)*3]:
+                    xmin, ymin, xmax, ymax = background_boxes[box_idx]
+                    proposal_img = img_org[:, xmin:xmax, ymin:ymax]
+                    self.data.append(proposal_img)
+                    self.labels.append(torch.tensor(len(self.org_data.category_id_to_name)))
 
-            if idx > 5:
+            if idx > 2:
                 break
 
         # save data
@@ -90,7 +91,8 @@ class TacoClassifierDataset(torch.utils.data.Dataset):
         return len(self.labels)
     
     def __getitem__(self, idx):
-        return self.transforms(self.data[idx]), self.labels[idx]
+        # return self.transforms(self.data[idx]), self.labels[idx]
+        return transforms.functional.resize(self.data[idx], (128,128)) , self.labels[idx]
 
 class TacoClassifier:
     def __init__(self, project = "Taco", name = None, model = None, config = None, use_wandb = True, verbose = True, show_test_images = False, model_save_freq = None, **kwargs):
@@ -321,7 +323,7 @@ class TacoClassifier:
             
             
             # test 
-            val_acc, val_loss, conf_mat = self.test(validation=True)            
+            val_acc, val_loss = self.test(validation=True)            
             
             
             # Save model
@@ -413,4 +415,14 @@ if __name__ == "__main__":
 
     # classifier.test(save_images=10)
 
-    # dataset = TacoClassifierDataset(ss_size=(100, 100))
+    # dataset = TacoClassifierDataset(ss_size=(100, 100), datatype="train")
+    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=16, shuffle=True)
+    # for i, (data, target) in enumerate(dataloader):
+    #     print(i)
+    #     print(data.shape)
+    #     print(target)
+
+    # for i in range(len(dataset)):
+    #     print(i)
+    #     print(dataset[i][0].shape)
+    #     print(dataset[i][1])
