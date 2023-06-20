@@ -8,12 +8,14 @@ import torchvision.transforms as transforms
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import pickle
 
 class TacoDataset(torch.utils.data.Dataset):
     def __init__(self, datatype = "train", img_size = None, length = None):
         self.length = length
         self.datatype = datatype
-        self.root = '/dtu/datasets1/02514/data_wastedetection/'
+        # self.root = '/mnt/c/Users/frede/Downloads/data_wastedetection/'
+        self.root = "/dtu/datasets1/02514/data_wastedetection/"
         self.anns_file_path = self.root + '/' + 'annotations.json'
         self.coco = COCO(self.anns_file_path)
         self.ids = list(sorted(self.coco.imgs.keys()))
@@ -33,6 +35,9 @@ class TacoDataset(torch.utils.data.Dataset):
                 self.cat_to_id[cat] = n_cat
                 n_cat += 1
         self.category_id_to_name = {v: k for k, v in self.cat_to_id.items()}
+
+        with open("category_id_to_name.pkl", "wb") as f:
+            pickle.dump(self.category_id_to_name, f)
 
         # split into train and test
         np.random.seed(0)
@@ -116,6 +121,7 @@ class TacoDataset(torch.utils.data.Dataset):
                 xmax = (coco_annotation[i]['bbox'][0] + coco_annotation[i]['bbox'][2]) * target_width / img_width
                 ymax = (coco_annotation[i]['bbox'][1] + coco_annotation[i]['bbox'][3]) * target_height / img_height
                 boxes.append([xmin, ymin, xmax, ymax])
+                # print(f"Resized bbox from {coco_annotation[i]['bbox']} to {[xmin, ymin, xmax, ymax]}")
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         
         # Labels (In my case, I only one class: target class or background)
@@ -223,7 +229,7 @@ if __name__ == "__main__":
     for imgs, annotations in data_loader:
         imgs = list(img.to(device) for img in imgs)
         annotations = [{k: v.to(device) for k, v in t.items()} for t in annotations]
-        print(annotations)
+        # print(annotations)
         
         show_img(imgs[0], annotations[0], dataset.category_id_to_name)
         plt.savefig("test.png")
