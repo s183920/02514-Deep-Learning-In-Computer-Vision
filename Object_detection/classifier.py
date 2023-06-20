@@ -22,6 +22,7 @@ import wandb
 from tqdm import tqdm
 import pickle
 import matplotlib.pyplot as plt
+from val_metrics import recall, precision, IoU, AP
 
 background_class = 0
 
@@ -355,7 +356,11 @@ class TacoClassifier:
         predicted = output.argmax(1)
         train_correct = (target==predicted).sum().cpu().item()
 
-        return train_correct, loss
+        recall = recall_score(target.cpu(), predicted.cpu())
+        precision = precision_score(target.cpu(), predicted.cpu())
+        AP = AP_score(target.cpu(), predicted.cpu())
+
+        return train_correct, loss, recall, precision, AP
 
 
     def train(self, num_epochs=None, cuda_device = [0]):
@@ -367,12 +372,18 @@ class TacoClassifier:
         for epoch in tqdm(range(num_epochs), unit='epoch'):
             train_correct = 0
             train_loss = 0
+            recall = 0
+            precision = 0
+            AP = 0
             self.model.train()
             pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
             for minibatch_no, (data, target) in pbar:
-                train_correct_, train_loss_ = self.train_step(data, target)
+                train_correct_, train_loss_, recall_, precision_, AP_ = self.train_step(data, target)
                 train_correct += train_correct_
                 train_loss += train_loss_.item()
+                recall += recall_
+                precision += precision_
+                AP += AP_
 
                 # break if dev mode
                 if self.dev_mode:
@@ -383,6 +394,10 @@ class TacoClassifier:
             train_acc = train_correct/len(self.data_train)*100
             if self.verbose:
                 print("Accuracy train: {train:.1f}%".format(train=train_acc))
+            
+            mAP = AP/len(self.train_loader)
+            avg_Recall = recall/len(self.train_loader)
+            avg_Precision = precision/len(self.train_loader)
             
             
             # test 
@@ -404,6 +419,9 @@ class TacoClassifier:
                 self.wandb_run.log({
                     "Train metrics/train_acc":    train_acc,
                     "Train metrics/train_loss":   train_loss,
+                    "Train metrics/recall":       avg_Recall,
+                    "Train metrics/precision":    avg_Precision,
+                    "Train metrics/AP":           mAP,
                     "Validation metrics/val_acc":     val_acc,
                     "Validation metrics/val_loss":    val_loss,
                     "epoch":        epoch,
