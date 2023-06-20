@@ -33,35 +33,35 @@ def resize_img(img, img_size = (500, 500)):
     img = transforms.ToTensor()(img)
     return img, (width_scale, height_scale)
 
-def resize_boxes(boxes, scale):
-    boxes[:, 0] = (boxes[:, 0] / scale[0]).astype(int)
-    boxes[:, 1] = (boxes[:, 1] / scale[1]).astype(int)
-    boxes[:, 2] = (boxes[:, 2] / scale[0]).astype(int)
-    boxes[:, 3] = (boxes[:, 3] / scale[1]).astype(int)
-    return boxes
+# def resize_boxes(boxes, scale):
+#     boxes[:, 0] = (boxes[:, 0] / scale[0]).astype(int)
+#     boxes[:, 1] = (boxes[:, 1] / scale[1]).astype(int)
+#     boxes[:, 2] = (boxes[:, 2] / scale[0]).astype(int)
+#     boxes[:, 3] = (boxes[:, 3] / scale[1]).astype(int)
+#     return boxes
 
-def draw_boxes(image, boxes, labels = None):
-    # Create a copy of the original image
-    image = image.cpu().numpy().transpose(1, 2, 0)
-    image_copy = image.copy()
-    # image_copy = image.copy()
-    # image_copy = transforms.ToPILImage()(image)
-    if image_copy.dtype == "float32":
-        image_copy *= 255
+# def draw_boxes(image, boxes, labels = None):
+#     # Create a copy of the original image
+#     image = image.cpu().numpy().transpose(1, 2, 0)
+#     image_copy = image.copy()
+#     # image_copy = image.copy()
+#     # image_copy = transforms.ToPILImage()(image)
+#     if image_copy.dtype == "float32":
+#         image_copy *= 255
 
-    # Draw rectangles on the image
-    for idx, box in enumerate(boxes):
-        x1, y1, x2, y2 = box
-        # x, y, w, h = int(x), int(y), int(w), int(h)
-        cv2.rectangle(image_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        if labels is not None:
-            cv2.putText(image_copy, labels[idx], (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+#     # Draw rectangles on the image
+#     for idx, box in enumerate(boxes):
+#         x1, y1, x2, y2 = box
+#         # x, y, w, h = int(x), int(y), int(w), int(h)
+#         cv2.rectangle(image_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
+#         if labels is not None:
+#             cv2.putText(image_copy, labels[idx], (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-    # Convert the image from BGR to RGB
-    # image_rgb = cv2.cvtColor(image_copy, cv2.COLOR_BGR2RGB)
+#     # Convert the image from BGR to RGB
+#     # image_rgb = cv2.cvtColor(image_copy, cv2.COLOR_BGR2RGB)
 
     
-    return image_copy.astype("uint8")
+#     return image_copy.astype("uint8")
 
 class ObjectDetector:
     def __init__(self) -> None:
@@ -188,7 +188,7 @@ class ObjectDetector:
 
     def get_scores(self, img, boxes, box_preds, gt_ann = None):
         box_preds = box_preds.detach().cpu()
-        AP = calculate_average_precision(gt_ann["boxes"], boxes, box_preds.argmax(dim = 1))
+        AP = calculate_average_precision(gt_ann["boxes"], boxes, box_preds.argmax(dim = 1), iou_threshold=0.2)
         
         aps = []
         for i in range(1, 29):
@@ -230,7 +230,7 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     od = ObjectDetector()
-    dataset = TacoDataset(datatype="train", img_size=None)
+    dataset = TacoDataset(datatype="test", img_size=None)
     data_loader = get_dataloader(dataset)
 
     APs = []

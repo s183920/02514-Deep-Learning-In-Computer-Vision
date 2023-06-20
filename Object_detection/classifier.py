@@ -486,11 +486,14 @@ class TacoClassifier:
 
 if __name__ == "__main__":
     classifier = TacoClassifier(project="TacoClassifier", name = "Resnet50", 
-                                show_test_images=False, model = "resnet", use_wandb=True, 
+                                show_test_images=False, model = "resnet", use_wandb=False, 
                                 num_epochs=100,
-                                optimizer = "Adam")
+                                optimizer = "Adam", data="test")
 
-    classifier.train()
+    # classifier.train()
+
+    classifier.load_model("wandb:deepcomputer/TacoClassifier/Resnet50_model:latest")
+    classifier.test()
 
     # classifier.test(save_images=10)
 
