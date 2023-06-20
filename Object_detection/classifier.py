@@ -356,9 +356,7 @@ class TacoClassifier:
         predicted = output.argmax(1)
         train_correct = (target==predicted).sum().cpu().item()
 
-        recall = recall_score(target.cpu(), predicted.cpu())
-        precision = precision_score(target.cpu(), predicted.cpu())
-        AP = AP_score(target.cpu(), predicted.cpu())
+        AP, precision, recall  = Average_Precision(output, target)
 
         return train_correct, loss, recall, precision, AP
 
