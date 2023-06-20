@@ -11,12 +11,16 @@ wandb_defaults = {
 }
 
 default_classifier_config = {
-    "model"	: "Resnet50",
+    "model"	: "Resnet",
     "seed":0,
 	"optimizer" : "Adam",
 	"loss_fun" : "CrossEntropyLoss",
 	"num_epochs" : 25,
 	### model params
 	"finetune": False,
+    "classification_size" : (256, 256),
+    "ss_size" : (800, 800),
+    "k1" : 0.7,
+    "k2" : 0.3,
 }
 
