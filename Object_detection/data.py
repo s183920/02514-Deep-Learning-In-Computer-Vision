@@ -10,21 +10,32 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 class TacoDataset(torch.utils.data.Dataset):
-    def __init__(self, datatype = "train"):
+    def __init__(self, datatype = "train", img_size = None, length = None):
+        self.length = length
         self.datatype = datatype
         self.root = '/dtu/datasets1/02514/data_wastedetection/'
         self.anns_file_path = self.root + '/' + 'annotations.json'
         self.coco = COCO(self.anns_file_path)
         self.ids = list(sorted(self.coco.imgs.keys()))
         
+
+        self.img_size = img_size
+
         self.transforms = transforms.Compose([
-            # transforms.PILToTensor(),
             transforms.ToTensor(),
         ])
         
-        self.category_id_to_name = {d["id"]: d["name"] for d in self.coco.dataset["categories"]}
-        
+        self.category_org_id_to_name = {d["id"]: d["supercategory"] for d in self.coco.dataset["categories"]}
+        self.cat_to_id = {"background":0}
+        n_cat = 1
+        for cat in self.category_org_id_to_name.values():
+            if cat not in self.cat_to_id:
+                self.cat_to_id[cat] = n_cat
+                n_cat += 1
+        self.category_id_to_name = {v: k for k, v in self.cat_to_id.items()}
+
         # split into train and test
+        np.random.seed(0)
         idxs = np.arange(len(self.ids))
         idxs = np.random.permutation(idxs)
         self.train_idxs = idxs[:int(0.8*len(idxs))]
@@ -32,10 +43,23 @@ class TacoDataset(torch.utils.data.Dataset):
         self.train_idxs = self.train_idxs[:int(0.8*len(self.train_idxs))]
         self.val_idxs = self.train_idxs[int(0.8*len(self.train_idxs)):]
 
-        print(f"Number of train images: {len(self.train_idxs)}")
-        print(f"Number of val images: {len(self.val_idxs)}")
-        print(f"Number of test images: {len(self.test_idxs)}")
-        
+        if self.length is not None:
+            self.train_idxs = self.train_idxs[:self.length]
+            self.val_idxs = self.val_idxs[:self.length]
+            self.test_idxs = self.test_idxs[:self.length]
+
+        # print(f"Number of train images: {len(self.train_idxs)}")
+        # print(f"Number of val images: {len(self.val_idxs)}")
+        # print(f"Number of test images: {len(self.test_idxs)}")
+    
+    def get_img(self, img_id):
+        # path for input image
+        path = self.coco.loadImgs(img_id)[0]['file_name']
+        # open the input image
+        img = Image.open(os.path.join(self.root, path))
+
+        return img
+
     def __getitem__(self, idx):
         if self.datatype == "train":
             idx = self.train_idxs[idx]
@@ -52,11 +76,26 @@ class TacoDataset(torch.utils.data.Dataset):
         ann_ids = coco.getAnnIds(imgIds=img_id)
         # Dictionary: target coco_annotation file for an image
         coco_annotation = coco.loadAnns(ann_ids)
-        # path for input image
-        path = coco.loadImgs(img_id)[0]['file_name']
-        # open the input image
-        img = Image.open(os.path.join(self.root, path))
+        
+        img = self.get_img(img_id)
 
+        
+
+        
+        # Resize image and calculate the scaling factor based on the aspect ratio
+        if self.img_size is not None:
+            img_width, img_height = img.size
+            aspect_ratio = img_width / img_height 
+            target_width = int(self.img_size[0]) 
+            target_height = int(self.img_size[0] / aspect_ratio) if self.img_size is not None else img_height
+            if target_height > self.img_size[1]:
+                target_height = int(self.img_size[1])
+                target_width = int(self.img_size[1] * aspect_ratio)
+
+            print(f"Resizing image from {img.size} to {(target_width, target_height)}")
+            img = img.resize((target_width, target_height), resample=Image.LANCZOS) # Image.ANTIALIAS)
+
+        
         # number of objects in the image
         num_objs = len(coco_annotation)
 
@@ -65,18 +104,30 @@ class TacoDataset(torch.utils.data.Dataset):
         # In pytorch, the input should be [xmin, ymin, xmax, ymax]
         boxes = []
         for i in range(num_objs):
-            xmin = coco_annotation[i]['bbox'][0]
-            ymin = coco_annotation[i]['bbox'][1]
-            xmax = xmin + coco_annotation[i]['bbox'][2]
-            ymax = ymin + coco_annotation[i]['bbox'][3]
-            boxes.append([xmin, ymin, xmax, ymax])
+            if self.img_size is None:
+                xmin = coco_annotation[i]['bbox'][0]
+                ymin = coco_annotation[i]['bbox'][1]
+                xmax = xmin + coco_annotation[i]['bbox'][2]
+                ymax = ymin + coco_annotation[i]['bbox'][3]
+                boxes.append([xmin, ymin, xmax, ymax])
+            else:
+                xmin = coco_annotation[i]['bbox'][0] * target_width / img_width
+                ymin = coco_annotation[i]['bbox'][1] * target_height / img_height
+                xmax = (coco_annotation[i]['bbox'][0] + coco_annotation[i]['bbox'][2]) * target_width / img_width
+                ymax = (coco_annotation[i]['bbox'][1] + coco_annotation[i]['bbox'][3]) * target_height / img_height
+                boxes.append([xmin, ymin, xmax, ymax])
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         
         # Labels (In my case, I only one class: target class or background)
         # labels = torch.ones((num_objs,), dtype=torch.int64)
         label_ids, labels = [], []
         for i in range(num_objs):
-            labels.append(coco_annotation[i]['category_id'])
+            # labels.append(coco_annotation[i]['category_id'])
+            l = coco_annotation[i]['category_id']
+            l = self.category_org_id_to_name[l]
+            l = self.cat_to_id[l]
+            labels.append(l)
+
             # label_ids.append(coco_annotation[i]['category_id'])
             # labels.append(self.category_id_to_name[coco_annotation[i]['category_id']])
         labels = torch.as_tensor(labels)
@@ -98,6 +149,8 @@ class TacoDataset(torch.utils.data.Dataset):
         my_annotation["labels"] = labels
         my_annotation["image_id"] = img_id
         my_annotation["area"] = areas
+        my_annotation["width_scale"] = target_width / img_width if self.img_size is not None else 1.0
+        my_annotation["height_scale"] = target_height / img_height if self.img_size is not None else 1.0
         
 
         if self.transforms is not None:
@@ -106,7 +159,6 @@ class TacoDataset(torch.utils.data.Dataset):
         return img, my_annotation
 
     def __len__(self):
-        # return len(self.ids)
         if self.datatype == "train":
             return len(self.train_idxs)
         elif self.datatype == "val":
@@ -131,15 +183,18 @@ def get_dataloader(dataset):
 
     return data_loader
 
-def show_img(img, annotations, label_dict, ax = None):
+def show_img(image, annotations, label_dict, ax = None):
     """Show image with annotations"""
-    if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=(16, 8))
     
+    if ax is None:
+        fig, ax = plt.subplots()
+    
+    img = image.copy()
     img = img.cpu().numpy().transpose(1, 2, 0)
-    img = np.clip(img, 0, 1)
+    # img = np.clip(img, 0, 1)
     
     ax.imshow(img)
+    ax.set_axis_off()
     
     for idx in range(len(annotations["boxes"])):
         box = annotations["boxes"][idx].cpu()
@@ -155,9 +210,10 @@ def show_img(img, annotations, label_dict, ax = None):
         
     # plt.show()
 
+
 if __name__ == "__main__":
     # create own Dataset
-    dataset = TacoDataset()
+    dataset = TacoDataset(img_size=(300, 300), datatype="train")
     data_loader = get_dataloader(dataset)
     
     # select device (whether GPU or CPU)
