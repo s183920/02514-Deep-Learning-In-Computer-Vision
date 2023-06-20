@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 class TacoDataset(torch.utils.data.Dataset):
-    def __init__(self, datatype = "train", img_size = None):
+    def __init__(self, datatype = "train", img_size = None, length = None):
+        self.length = length
         self.datatype = datatype
         self.root = '/mnt/c/Users/frede/Downloads/data_wastedetection/'
         self.anns_file_path = self.root + '/' + 'annotations.json'
@@ -24,8 +25,15 @@ class TacoDataset(torch.utils.data.Dataset):
             transforms.ToTensor(),
         ])
         
-        self.category_id_to_name = {d["id"]: d["name"] for d in self.coco.dataset["categories"]}
-        
+        self.category_org_id_to_name = {d["id"]: d["supercategory"] for d in self.coco.dataset["categories"]}
+        self.cat_to_id = {"background":0}
+        n_cat = 1
+        for cat in self.category_org_id_to_name.values():
+            if cat not in self.cat_to_id:
+                self.cat_to_id[cat] = n_cat
+                n_cat += 1
+        self.category_id_to_name = {v: k for k, v in self.cat_to_id.items()}
+
         # split into train and test
         np.random.seed(0)
         idxs = np.arange(len(self.ids))
@@ -35,9 +43,14 @@ class TacoDataset(torch.utils.data.Dataset):
         self.train_idxs = self.train_idxs[:int(0.8*len(self.train_idxs))]
         self.val_idxs = self.train_idxs[int(0.8*len(self.train_idxs)):]
 
-        print(f"Number of train images: {len(self.train_idxs)}")
-        print(f"Number of val images: {len(self.val_idxs)}")
-        print(f"Number of test images: {len(self.test_idxs)}")
+        if self.length is not None:
+            self.train_idxs = self.train_idxs[:self.length]
+            self.val_idxs = self.val_idxs[:self.length]
+            self.test_idxs = self.test_idxs[:self.length]
+
+        # print(f"Number of train images: {len(self.train_idxs)}")
+        # print(f"Number of val images: {len(self.val_idxs)}")
+        # print(f"Number of test images: {len(self.test_idxs)}")
     
     def get_img(self, img_id):
         # path for input image
@@ -109,7 +122,12 @@ class TacoDataset(torch.utils.data.Dataset):
         # labels = torch.ones((num_objs,), dtype=torch.int64)
         label_ids, labels = [], []
         for i in range(num_objs):
-            labels.append(coco_annotation[i]['category_id'])
+            # labels.append(coco_annotation[i]['category_id'])
+            l = coco_annotation[i]['category_id']
+            l = self.category_org_id_to_name[l]
+            l = self.cat_to_id[l]
+            labels.append(l)
+
             # label_ids.append(coco_annotation[i]['category_id'])
             # labels.append(self.category_id_to_name[coco_annotation[i]['category_id']])
         labels = torch.as_tensor(labels)
@@ -141,7 +159,6 @@ class TacoDataset(torch.utils.data.Dataset):
         return img, my_annotation
 
     def __len__(self):
-        # return len(self.ids)
         if self.datatype == "train":
             return len(self.train_idxs)
         elif self.datatype == "val":
