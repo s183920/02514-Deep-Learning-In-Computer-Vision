@@ -19,8 +19,11 @@ default_classifier_config = {
 	### model params
 	"finetune": False,
     "classification_size" : (256, 256),
-    "ss_size" : (800, 800),
+    "ss_size" : (500, 500),
     "k1" : 0.7,
     "k2" : 0.3,
+    "train_size" : None,
+    "val_size" : None,
+    "test_size" : None,
 }
 

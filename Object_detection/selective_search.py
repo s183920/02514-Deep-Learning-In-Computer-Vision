@@ -2,6 +2,8 @@ import cv2
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
+import torchvision
+import torch
 
 
 def selective_search(img, max_proposals):
@@ -33,6 +35,7 @@ def non_maximum_suppression(boxes, scores, threshold):
     # Sort boxes by scores in descending order
     sorted_indices = np.argsort(scores)[::-1]
     boxes = boxes[sorted_indices]
+
     
     # Initialize a list to store the selected box indices
     selected_indices = []
@@ -42,8 +45,12 @@ def non_maximum_suppression(boxes, scores, threshold):
         box = boxes[i]
         
         # Calculate IoU with previously selected boxes
-        ious = calculate_iou(box, boxes[selected_indices])
-        
+        # ious = calculate_iou(box, boxes[selected_indices])
+        b1 = torch.from_numpy(box.reshape(1, *box.shape))
+        b2 = torch.from_numpy(boxes[selected_indices])
+        ious = torchvision.ops.box_iou(b1, b2)
+        # print(ious)
+
         # Check for NaN values in ious array
         if np.isnan(ious).any():
             continue
@@ -56,7 +63,7 @@ def non_maximum_suppression(boxes, scores, threshold):
             selected_indices.append(i)
     
     # Return the selected boxes
-    return boxes[selected_indices]
+    return boxes[selected_indices], selected_indices
 
 
 def calculate_iou(box, boxes):
@@ -75,7 +82,7 @@ def calculate_iou(box, boxes):
     union_area = box_area + boxes_area - intersection_area
     
     # Calculate IoU
-    print(intersection_area, union_area)
+    # print(intersection_area, union_area)
     iou = intersection_area / union_area
     
     return iou
