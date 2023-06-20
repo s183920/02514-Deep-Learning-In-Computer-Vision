@@ -198,3 +198,4 @@ gan/code/StyleCLIP-master/style_clip_env/*
 gan/results/*
 gan/feature_dataset/*
 Object_detection/cls_data/*
+Object_detection/results/*
