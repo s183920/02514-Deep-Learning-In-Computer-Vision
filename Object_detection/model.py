@@ -47,6 +47,16 @@ class Resnet(nn.Module):
         x = self.classifier(x)
         return x
     
+    def set_model(self, model):
+        print(f"Setting model to {model}")
+        
+        model = models.get(model.lower())
+        if model is None:
+            raise ValueError(f"Model not found")
+      
+        self.model = model(finetune = self.config["finetune"])
+
+        self.model.to(self.device)
     @property 
     def name(self):
         return "Resnet"
