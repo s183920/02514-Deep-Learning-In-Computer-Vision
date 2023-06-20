@@ -4,12 +4,13 @@ import torch
 import torch.nn as nn
 import torchvision
 
-class Resnet50(nn.Module):
+class Resnet(nn.Module):
     def __init__(self, finetune = False, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.finetune = finetune
         
-        self.resnet = torchvision.models.resnet50(pretrained = True)
+        # self.resnet = torchvision.models.resnet50(pretrained = True)
+        self.resnet = torchvision.models.resnet50(weights='IMAGENET1K_V1')
         
         if not self.finetune:
             for param in self.resnet.parameters():
@@ -24,7 +25,7 @@ class Resnet50(nn.Module):
             nn.ReLU(),
             nn.Linear(256,100),
             nn.ReLU(),
-            nn.Linear(100,61),
+            nn.Linear(100,29),
         )
         
         # replace fc layer
@@ -32,7 +33,7 @@ class Resnet50(nn.Module):
         
         # add sigmoid layer
         self.classifier = nn.Sequential(
-            nn.LogSoftmax()
+            nn.LogSoftmax(dim=1)
         )
         
     def parameters(self, recurse: bool = True) -> Iterator[Parameter]:
@@ -48,8 +49,8 @@ class Resnet50(nn.Module):
     
     @property 
     def name(self):
-        return "Resnet18"
+        return "Resnet"
     
 models = {
-    "resnet50" : Resnet50,
+    "resnet" : Resnet,
 }

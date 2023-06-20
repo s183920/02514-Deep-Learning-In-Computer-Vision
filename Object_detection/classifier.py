@@ -1,41 +1,66 @@
-from hparams import default_classifier_config, wandb_defaults
+try:
+    from Object_detection.hparams import default_classifier_config, wandb_defaults
+    from Object_detection.selective_search import selective_search, rect_coordinates
+    from Object_detection.data import TacoDataset, get_dataloader
+    from Object_detection.utils import download_model
+    from Object_detection.model import models
+except ModuleNotFoundError:
+    from hparams import default_classifier_config, wandb_defaults
+    from selective_search import selective_search, rect_coordinates
+    from data import TacoDataset, get_dataloader
+    from utils import download_model
+    from model import models
+
 import torch
 import torch.nn.functional as F
 import torchvision
 from torchvision import transforms
 import torch.utils.data
 from datetime import datetime as dt
-from utils import download_model
-from model import models
 import os
 import wandb
 from tqdm import tqdm
-from data import TacoDataset, get_dataloader
 import pickle
-from selective_search import selective_search, rect_coordinates
 import matplotlib.pyplot as plt
 
+background_class = 0
+
 class TacoClassifierDataset(torch.utils.data.Dataset):
-    def __init__(self, datatype = "train", ss_size = None):
+    def __init__(self, datatype = "train", img_size = (128, 128), ss_size = None, k1 = 0.5, k2 = 0.5):
         super().__init__()
 
-        self.org_data = TacoDataset(datatype = datatype, img_size = ss_size)
+        self.ss_size = ss_size
+        self.datatype = datatype
+        self.k1 = k1
+        self.k2 = k2
+        self.img_size = img_size
 
-        self.data_path = "Object_detection/cls_data/" + datatype + "_" + str(ss_size) + ".pkl"
+        self.length = None
+        self.org_data = TacoDataset(datatype = self.datatype, img_size = None, length = self.length)
+        self.category_id_to_name = self.org_data.category_id_to_name
+        self.category_id_to_name[background_class] = "background"
+
+        size_str = str(self.ss_size[0]) if self.ss_size is not None else "none"
+        self.data_path = "Object_detection/cls_data/" + datatype + "_" + size_str + ".pkl"
         if os.path.exists(self.data_path):
-            print("Loading data")
-            self.load_data()
+            print("Loading proposal boxes")
+            self.load_boxes()
         else:
-            print("Creating data")
-            self.create_data()
+            print("Creating proposal boxes")
+            self.create_boxes()
+
+        self.create_data()
 
 
         # self.transforms = transforms.Compose([
         #     transforms.Resize((128, 128)),
         #     # transforms.ToTensor(),
         # ])
-        
+
     def create_data(self):
+        print("Creating images and labels")
+
+
         self.labels = []
         self.data = []
 
@@ -45,54 +70,90 @@ class TacoClassifierDataset(torch.utils.data.Dataset):
             img_org = self.org_data.transforms(img_org)
 
             # get selective search boxes
-            proposal_boxes = selective_search(img)
-            proposal_boxes[:, 2] += proposal_boxes[:, 0]
-            proposal_boxes[:, 3] += proposal_boxes[:, 1]
-            proposal_boxes = torch.tensor(proposal_boxes, dtype = torch.int32)
+            proposal_boxes = self.proposal_boxes[gt_ann["image_id"].item()]
 
             # get ious
             ious = torchvision.ops.box_iou(proposal_boxes, gt_ann["boxes"])
 
             # select foreground and background boxes
             max_ious, box_idxs = torch.max(ious, dim = 1)
-            foreground_boxes = proposal_boxes[max_ious >= 0.5]
-            background_boxes = proposal_boxes[max_ious < 0.5]
+            foreground_boxes = proposal_boxes[max_ious >= self.k1]
+            background_boxes = proposal_boxes[max_ious < self.k2]
 
             if len(foreground_boxes) > 0:
                 for i, box in enumerate(foreground_boxes):
                     xmin, ymin, xmax, ymax = box
+                    xmax = min(xmax+1, img_org.shape[1])
+                    ymax = min(ymax+1, img_org.shape[2])
+                    # if ((xmax-xmin) == 0) or ((ymax-ymin) == 0):
+                    #     continue
                     proposal_img = img_org[:, xmin:xmax, ymin:ymax]
+                    if 0 in proposal_img.shape:
+                        continue
                     self.data.append(proposal_img)
                     self.labels.append(gt_ann["labels"][box_idxs[i]])
+                    # assert xmax-xmin != 0 and ymax-ymin != 0, "Box is 0"
 
                 for box_idx in torch.randperm(len(background_boxes))[:len(foreground_boxes)*3]:
                     xmin, ymin, xmax, ymax = background_boxes[box_idx]
+                    xmax = min(xmax+1, img_org.shape[1])
+                    ymax = min(ymax+1, img_org.shape[2])
+                    # if ((xmax-xmin) == 0) or ((ymax-ymin) == 0):
+                    #     continue
                     proposal_img = img_org[:, xmin:xmax, ymin:ymax]
+                    if 0 in proposal_img.shape:
+                        continue
                     self.data.append(proposal_img)
-                    self.labels.append(torch.tensor(len(self.org_data.category_id_to_name)))
+                    # l = torch.max(list(gt_ann["labels"].values())) +1
+                    self.labels.append(torch.tensor(background_class))
+                    # assert xmax-xmin != 0 and ymax-ymin != 0, "Box is 0"
+        
+    def create_boxes(self):
+        self.proposal_boxes = {}
 
-            if idx > 2:
-                break
+        org_data = TacoDataset(datatype = self.datatype, img_size = self.ss_size, length = self.length)
+
+        for idx, data in tqdm(enumerate(org_data), total = len(org_data)):
+            img, gt_ann = data
+            # img_org = self.org_data.get_img(gt_ann["image_id"].item())
+            # img_org = self.org_data.transforms(img_org)
+
+            proposal_boxes = selective_search(img)
+            proposal_boxes[:, 2] += proposal_boxes[:, 0]
+            proposal_boxes[:, 3] += proposal_boxes[:, 1]
+
+            print(gt_ann["width_scale"], gt_ann["height_scale"])
+
+            proposal_boxes[:, 0] = (proposal_boxes[:, 0] / gt_ann["width_scale"]).astype(int)
+            proposal_boxes[:, 1] = (proposal_boxes[:, 1] / gt_ann["height_scale"]).astype(int)
+            proposal_boxes[:, 2] = (proposal_boxes[:, 2] / gt_ann["width_scale"]).astype(int)
+            proposal_boxes[:, 3] = (proposal_boxes[:, 3] / gt_ann["height_scale"]).astype(int)
+
+            proposal_boxes = torch.tensor(proposal_boxes, dtype = torch.int32)
+
+            self.proposal_boxes[gt_ann["image_id"].item()] = proposal_boxes
 
         # save data
         os.makedirs(os.path.dirname(self.data_path), exist_ok = True)
         with open(self.data_path, "wb") as f:
-            pickle.dump((self.data, self.labels), f)
+            pickle.dump(self.proposal_boxes, f)
 
 
-    def load_data(self):
+    def load_boxes(self):
         with open(self.data_path, "rb") as f:
-            self.data, self.labels = pickle.load(f)
+            self.proposal_boxes = pickle.load(f)
 
         print("Loaded data from", self.data_path)
-        print("Number of samples:", len(self))
 
     def __len__(self):
         return len(self.labels)
     
     def __getitem__(self, idx):
         # return self.transforms(self.data[idx]), self.labels[idx]
-        return transforms.functional.resize(self.data[idx], (128,128)) , self.labels[idx]
+        # print(idx)
+        # print(self.data[idx].shape)
+        # print(self.labels[idx])
+        return transforms.functional.resize(self.data[idx], self.img_size, antialias=True) , self.labels[idx]
 
 class TacoClassifier:
     def __init__(self, project = "Taco", name = None, model = None, config = None, use_wandb = True, verbose = True, show_test_images = False, model_save_freq = None, **kwargs):
@@ -191,9 +252,10 @@ class TacoClassifier:
 
 
     def set_dataset(self):
-        self.data_train = TacoClassifierDataset(datatype = "train", ss_size=self.config["ss_size"])
-        self.data_test = TacoClassifierDataset(datatype = "test", ss_size=self.config["ss_size"])
-        self.data_val = TacoClassifierDataset(datatype = "val", ss_size=self.config["ss_size"])
+        params = {"ss_size": self.config["ss_size"], "k1" : self.config["k1"], "k2" : self.config["k2"], "img_size":self.config["classification_size"]}
+        self.data_train = TacoClassifierDataset(datatype = "train", **params)
+        self.data_test = TacoClassifierDataset(datatype = "test", **params)
+        self.data_val = TacoClassifierDataset(datatype = "val", **params)
 
         self.train_loader = torch.utils.data.DataLoader(self.data_train,
                                             batch_size=32,
@@ -256,11 +318,12 @@ class TacoClassifier:
             os.environ["CUDA_VISIBLE_DEVICES"] = str(cuda_device).strip("[]").replace(" ", "")
 
         # set loss function
-        loss_fun = self.config.get("loss_fun")
-        if loss_fun == "CrossEntropyLoss":
-            self.loss_fun = lambda output, target: F.cross_entropy(output, target)
-        else:
-            self.loss_fun = lambda output, target: F.nll_loss(torch.log(output), target)
+        self.loss_fun = lambda output, target: F.cross_entropy(output, target)
+        # loss_fun = self.config.get("loss_fun")
+        # if loss_fun == "CrossEntropyLoss":
+        #     self.loss_fun = lambda output, target: F.cross_entropy(output, target)
+        # else:
+        #     self.loss_fun = lambda output, target: F.nll_loss(torch.log(output), target)
 
         # set optimizer
         self.set_optimizer()
@@ -406,9 +469,9 @@ class TacoClassifier:
 
 
 if __name__ == "__main__":
-    classifier = TacoClassifier(project="TacoClassifier", name = None, 
-                                show_test_images=False, model = "resnet50", use_wandb=False, 
-                                num_epochs=10,
+    classifier = TacoClassifier(project="TacoClassifier", name = "Resnet50", 
+                                show_test_images=False, model = "resnet", use_wandb=True, 
+                                num_epochs=100,
                                 optimizer = "Adam",)
 
     classifier.train()
